@@ -483,3 +483,34 @@ button.danger { background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%); c
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+/* Weight field */
+.item-weight-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.item-weight-label {
+  font-size: 11px;
+  color: #8a9ab0;
+  white-space: nowrap;
+}
+
+.item-weight {
+  width: 60px;
+  padding: 3px 6px;
+  font-size: 12px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+  text-align: center;
+}
+
+.item-weight:focus {
+  outline: none;
+  border-color: #4a8fff;
+  background: rgba(74, 143, 255, 0.1);
+}

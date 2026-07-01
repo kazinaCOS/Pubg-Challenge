@@ -10,7 +10,8 @@ const settingsInputs = {
   overlayX: document.getElementById('overlay-x'),
   overlayY: document.getElementById('overlay-y'),
   overlayWidth: document.getElementById('overlay-width'),
-  overlayHeight: document.getElementById('overlay-height')
+  overlayHeight: document.getElementById('overlay-height'),
+  overlayTitlesOnly: document.getElementById('overlay-titles-only')
 };
 
 let settingsOpen = false;
@@ -115,6 +116,7 @@ function renderSettings(settings) {
   settingsInputs.overlayY.value = Number.isFinite(s.overlayY) ? s.overlayY : 20;
   settingsInputs.overlayWidth.value = Number.isFinite(s.overlayWidth) ? s.overlayWidth : 620;
   settingsInputs.overlayHeight.value = Number.isFinite(s.overlayHeight) ? s.overlayHeight : 260;
+  if (settingsInputs.overlayTitlesOnly) settingsInputs.overlayTitlesOnly.checked = s.overlayTitlesOnly === true;
 }
 
 function renderState(state) {
@@ -146,7 +148,8 @@ function getSettingsPayload() {
     overlayX: Number(settingsInputs.overlayX.value),
     overlayY: Number(settingsInputs.overlayY.value),
     overlayWidth: Number(settingsInputs.overlayWidth.value),
-    overlayHeight: Number(settingsInputs.overlayHeight.value)
+    overlayHeight: Number(settingsInputs.overlayHeight.value),
+    overlayTitlesOnly: settingsInputs.overlayTitlesOnly ? settingsInputs.overlayTitlesOnly.checked : false
   };
 }
 

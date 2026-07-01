@@ -13,22 +13,30 @@ body {
 
 .overlay {
   position: absolute;
-  top: 18px;
-  left: 18px;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  box-sizing: border-box;
 }
 
 .panel {
   display: inline-flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0.6em;
   max-width: 640px;
-  padding: 12px 14px;
+  padding: 0.85em 1em;
   background: rgba(8, 10, 14, 0.78);
   border: 1px solid rgba(255, 255, 255, 0.10);
-  border-radius: 18px;
+  border-radius: 1.2em;
   color: #ffffff;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
   backdrop-filter: blur(10px);
+  font-size: 14px; /* базовый, переопределяется autoScale() */
+  box-sizing: border-box;
+  width: 100%;
+  overflow-y: visible;
 }
 
 .tasks-header {
@@ -112,14 +120,14 @@ body {
 }
 
 .task-title {
-  font-size: 14px;
+  font-size: 1em;
   font-weight: 700;
   color: #fff;
   word-break: break-word;
 }
 
 .task-desc {
-  font-size: 12px;
+  font-size: 0.85em;
   color: #c0ccd8;
   word-break: break-word;
   line-height: 1.3;
@@ -173,4 +181,44 @@ body {
 .mini {
   font-size: 12px;
   color: #d9e0ea;
+}
+
+/* Статус задания в оверлее */
+.overlay-status {
+  margin-left: 5px;
+  font-size: 0.9em;
+}
+
+.task-row-done .task-title {
+  opacity: 0.65;
+}
+
+.task-row-done .diff-pill {
+  opacity: 0.5;
+}
+
+.task-row-fail .task-title {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.task-row-fail .diff-pill {
+  opacity: 0.45;
+}
+
+/* Все текстовые элементы масштабируются через em */
+.diff-pill {
+  font-size: 0.78em;
+}
+
+.curse-pill-title {
+  font-size: 0.85em;
+}
+
+.curse-pill-desc {
+  font-size: 0.78em;
+}
+
+.mini {
+  font-size: 0.85em;
 }

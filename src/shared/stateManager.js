@@ -9,18 +9,21 @@ class StateManager {
 
   getDefaultState() {
     return {
-      activeTasks: [],          // массив объектов { uid, id, difficulty, title, description, tags, generated? }
+      activeTasks: [],
       activeCurseIds: [],
-      generatedCurses: [],      // сгенерированные наказания (полные объекты с genId)
+      generatedCurses: [],
       completed: 0,
       failed: 0,
       recentTaskIds: [],
+      // Последние 2 раунда — массив массивов id заданий
+      roundHistory: [],
       settings: {
         overlayX: 20,
         overlayY: 20,
         overlayWidth: 620,
         overlayHeight: 260,
-        generatorEnabled: false
+        generatorEnabled: false,
+        overlayTitlesOnly: false
       }
     };
   }
@@ -32,7 +35,8 @@ class StateManager {
       overlayY: Number.isFinite(inputSettings.overlayY) ? inputSettings.overlayY : defaults.overlayY,
       overlayWidth: Number.isFinite(inputSettings.overlayWidth) ? Math.max(300, inputSettings.overlayWidth) : defaults.overlayWidth,
       overlayHeight: Number.isFinite(inputSettings.overlayHeight) ? Math.max(120, inputSettings.overlayHeight) : defaults.overlayHeight,
-      generatorEnabled: inputSettings.generatorEnabled === true
+      generatorEnabled: inputSettings.generatorEnabled === true,
+      overlayTitlesOnly: inputSettings.overlayTitlesOnly === true
     };
   }
 
@@ -60,13 +64,20 @@ class StateManager {
     const defaults = this.getDefaultState();
     const state = input && typeof input === 'object' ? input : {};
 
-    // Обратная совместимость: если есть currentTaskId — переносим в activeTasks
     let activeTasks = [];
     if (Array.isArray(state.activeTasks)) {
       activeTasks = state.activeTasks.map(t => this.normalizeActiveTask(t)).filter(Boolean);
     } else if (Number.isFinite(state.currentTaskId) && state.currentTaskId !== null) {
-      // старый формат — оставим пустым, ensureInitialRound заполнит
       activeTasks = [];
+    }
+
+    // roundHistory: массив из не более 2 массивов id
+    let roundHistory = [];
+    if (Array.isArray(state.roundHistory)) {
+      roundHistory = state.roundHistory
+        .filter(r => Array.isArray(r))
+        .map(r => r.filter(Number.isFinite))
+        .slice(0, 2);
     }
 
     return {
@@ -76,6 +87,7 @@ class StateManager {
       completed: Number.isFinite(state.completed) ? state.completed : defaults.completed,
       failed: Number.isFinite(state.failed) ? state.failed : defaults.failed,
       recentTaskIds: Array.isArray(state.recentTaskIds) ? state.recentTaskIds.filter(Number.isFinite).slice(0, 30) : [],
+      roundHistory,
       settings: this.normalizeSettings(state.settings)
     };
   }
@@ -117,6 +129,7 @@ class StateManager {
       completed: this.state.completed,
       failed: this.state.failed,
       recentTaskIds: this.state.recentTaskIds.slice(),
+      roundHistory: (this.state.roundHistory || []).map(r => r.slice()),
       settings: { ...this.state.settings }
     };
   }
@@ -124,10 +137,8 @@ class StateManager {
   getResolvedState(taskManager) {
     const raw = this.getPublicState();
 
-    // Активные задания — уже полные объекты в state
     const activeTasks = raw.activeTasks;
 
-    // Активные наказания = рукописные (по id) + сгенерированные (объекты)
     const writtenCurses = raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
     const activeCurses = [...writtenCurses, ...(this.state.generatedCurses || [])];
 
@@ -138,36 +149,47 @@ class StateManager {
       completed: raw.completed,
       failed: raw.failed,
       recentTaskIds: raw.recentTaskIds.slice(),
+      roundHistory: raw.roundHistory,
       settings: raw.settings
     };
   }
 
-  // Устанавливает массив активных заданий (до 3)
   setActiveTasks(tasks) {
     this.state.activeTasks = tasks.slice(0, 3).map(t => ({ ...t, status: t.status || 'active' }));
   }
 
-  // Помечает задание выполненным по uid
   markTaskCompleted(uid) {
     const t = this.state.activeTasks.find(t => t.uid === uid);
     if (t) t.status = 'completed';
     return t || null;
   }
 
-  // Помечает задание проваленным по uid
   markTaskFailed(uid) {
     const t = this.state.activeTasks.find(t => t.uid === uid);
     if (t) t.status = 'failed';
     return t || null;
   }
 
-  // Кол-во проваленных в текущем раунде
   countFailedInRound() {
     return this.state.activeTasks.filter(t => t.status === 'failed').length;
   }
 
   getActiveTasks() {
     return this.state.activeTasks.slice();
+  }
+
+  // Возвращает id заданий из последних 2 раундов (для исключения из следующего)
+  getRecentRoundIds() {
+    const ids = new Set();
+    (this.state.roundHistory || []).forEach(round => round.forEach(id => ids.add(id)));
+    return [...ids];
+  }
+
+  // Сохраняет текущий раунд в историю (вызывается при buildRound перед установкой нового)
+  pushRoundHistory(taskIds) {
+    if (!Array.isArray(this.state.roundHistory)) this.state.roundHistory = [];
+    this.state.roundHistory.unshift(taskIds.filter(Number.isFinite));
+    if (this.state.roundHistory.length > 2) this.state.roundHistory.length = 2;
   }
 
   addRecentTask(taskId) {
@@ -180,7 +202,6 @@ class StateManager {
   incrementCompleted() { this.state.completed += 1; }
   incrementFailed() { this.state.failed += 1; }
 
-  // Рукописное наказание по id
   addActiveCurse(curseId) {
     if (!Number.isFinite(curseId)) return;
     if (this.state.activeCurseIds.includes(curseId)) return;
@@ -188,7 +209,6 @@ class StateManager {
     this.state.activeCurseIds.push(curseId);
   }
 
-  // Сгенерированное наказание (полный объект)
   addGeneratedCurse(curse) {
     if (!curse) return;
     if (this.getActiveCursesCount() >= 3) return;
@@ -197,7 +217,6 @@ class StateManager {
     this.state.generatedCurses.push(curse);
   }
 
-  // curseId — число (рукописное) или строка genId (сгенерированное)
   removeActiveCurse(curseId) {
     if (typeof curseId === 'string' && curseId.startsWith('gen_')) {
       this.state.generatedCurses = (this.state.generatedCurses || []).filter(c => c.genId !== curseId);
@@ -222,9 +241,8 @@ class StateManager {
   }
 
   async removeMissingIds(taskManager) {
-    // Убираем задания которых больше нет в библиотеке (не generated)
     this.state.activeTasks = this.state.activeTasks.filter(t => {
-      if (t.generated) return true; // сгенерированные оставляем
+      if (t.generated) return true;
       return !!taskManager.getTaskById(t.id);
     });
     this.state.activeCurseIds = this.state.activeCurseIds.filter(id => !!taskManager.getCurseById(id));
@@ -241,6 +259,7 @@ class StateManager {
       completed: this.state.completed,
       failed: this.state.failed,
       recentTaskIds: this.state.recentTaskIds,
+      roundHistory: this.state.roundHistory || [],
       settings: this.state.settings
     };
     fs.writeFileSync(this.statePath, JSON.stringify(toSave, null, 2), 'utf8');

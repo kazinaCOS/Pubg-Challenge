@@ -83,6 +83,11 @@ function renderTaskList(container, items, allItems) {
         <input class="item-tags" type="text" data-field="tags" data-type="task" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
+        <label class="item-weight-row">
+          <span class="item-weight-label">Вес</span>
+          <input class="item-weight" type="number" min="1" max="100" data-field="weight" data-type="task" data-id="${item.id}"
+            value="${item.weight != null ? item.weight : 1}">
+        </label>
       </div>
       <button class="danger btn-delete" data-delete-type="task" data-delete-id="${item.id}">✕</button>
     </div>
@@ -115,6 +120,11 @@ function renderCurseList(container, items, allItems) {
         <input class="item-tags" type="text" data-field="tags" data-type="curse" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
+        <label class="item-weight-row">
+          <span class="item-weight-label">Вес</span>
+          <input class="item-weight" type="number" min="1" max="100" data-field="weight" data-type="curse" data-id="${item.id}"
+            value="${item.weight != null ? item.weight : 1}">
+        </label>
       </div>
       <button class="danger btn-delete" data-delete-type="curse" data-delete-id="${item.id}">✕</button>
     </div>
@@ -139,8 +149,10 @@ function collectTaskList(container) {
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     const diffEl = row.querySelector(`select[data-field="difficulty"]`);
     const difficulty = diffEl ? diffEl.value : 'easy';
+    const weightEl = row.querySelector(`input[data-field="weight"]`);
+    const weight = weightEl ? Math.max(1, Number(weightEl.value) || 1) : 1;
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags, difficulty });
+    result.push({ id, title, description: desc, tags, difficulty, weight });
   });
   return result;
 }
@@ -153,8 +165,10 @@ function collectCurseList(container) {
     const desc  = row.querySelector(`textarea[data-field="description"]`).value.trim();
     const tagsRaw = row.querySelector(`input[data-field="tags"]`).value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const weightEl = row.querySelector(`input[data-field="weight"]`);
+    const weight = weightEl ? Math.max(1, Number(weightEl.value) || 1) : 1;
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags });
+    result.push({ id, title, description: desc, tags, weight });
   });
   return result;
 }
@@ -175,7 +189,7 @@ function renderTemplateList(container, items, dataAttr, deleteFn, showDiff = fal
           <select class="item-diff" data-${dataAttr}-field="difficulty" data-${dataAttr}-id="${item.id}">
             <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
-            <option value="hard" ${item.difficulty === 'hard' ? 'selected' : ''}>Сложное</option>
+            <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
           </select>
         </div>
         ` : `
@@ -369,7 +383,7 @@ function previewGenerate() {
   const title = fill(template.title);
   const desc  = fill(template.description);
   const diff  = template.difficulty || 'easy';
-  const diffLabel = { easy: 'Лёгкое', medium: 'Среднее', hard: 'Сложное' }[diff] || diff;
+  const diffLabel = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое' }[diff] || diff;
 
   previewOutput.innerHTML = `
     <div class="preview-diff diff-${diff}">${esc(diffLabel)}</div>

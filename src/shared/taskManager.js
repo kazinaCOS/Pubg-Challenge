@@ -28,8 +28,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = Number.isFinite(item.weight) && item.weight > 0 ? item.weight : 1;
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, weight };
   }
 
   normalizeTemplate(item) {
@@ -40,8 +41,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = Number.isFinite(item.weight) && item.weight > 0 ? item.weight : 1;
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, weight };
   }
 
   normalizePools(input) {
@@ -70,8 +72,9 @@ class TaskManager {
     const title = typeof item.title === 'string' ? item.title.trim() : '';
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
+    const weight = Number.isFinite(item.weight) && item.weight > 0 ? item.weight : 1;
     if (!title && !description) return null;
-    return { id, title, description, tags };
+    return { id, title, description, tags, weight };
   }
 
   normalizeCurseTemplates(items = []) {
@@ -169,12 +172,23 @@ class TaskManager {
     return false;
   }
 
+  // Взвешенный выбор из массива (элементы должны иметь .weight)
+  weightedPick(pool) {
+    if (!pool.length) return null;
+    const total = pool.reduce((s, t) => s + (t.weight || 1), 0);
+    let r = Math.random() * total;
+    for (const t of pool) {
+      r -= (t.weight || 1);
+      if (r <= 0) return t;
+    }
+    return pool[pool.length - 1];
+  }
+
   // Генерирует задание из пула шаблонов с заданной сложностью, избегая конфликтов
   getGeneratedTask(activeCurses = [], difficulty = null) {
     let templates = this.library.templates;
     if (!templates.length) return null;
 
-    // Фильтр по сложности если задан
     if (difficulty) {
       const byDiff = templates.filter(t => t.difficulty === difficulty);
       if (byDiff.length) templates = byDiff;
@@ -183,7 +197,7 @@ class TaskManager {
     let available = templates.filter(t => !this.hasConflict(t, activeCurses));
     if (!available.length) available = templates;
 
-    const template = available[Math.floor(Math.random() * available.length)];
+    const template = this.weightedPick(available);
     return this.fillTemplate(template);
   }
 
@@ -191,38 +205,44 @@ class TaskManager {
   getGeneratedCurse() {
     const templates = this.library.curseTemplates;
     if (!templates.length) return null;
-    const template = templates[Math.floor(Math.random() * templates.length)];
+    const template = this.weightedPick(templates);
     const filled = this.fillTemplate(template);
     filled.generated = true;
     filled.isCurse = true;
     return filled;
   }
 
-  // Рукописное задание по сложности
-  getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null) {
+  // Рукописное задание по сложности с исключением дублей текущего раунда
+  getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null, excludeIds = []) {
     let pool = this.library.tasks;
 
-    // Фильтр по сложности
     if (difficulty) {
       const byDiff = pool.filter(t => t.difficulty === difficulty);
       if (byDiff.length) pool = byDiff;
     }
 
-    // Убираем недавние И конфликтные
-    let available = pool.filter(t => !recentTaskIds.includes(t.id) && !this.hasConflict(t, activeCurses));
-    if (!available.length) available = pool.filter(t => !recentTaskIds.includes(t.id));
+    const allExclude = [...new Set([...recentTaskIds, ...excludeIds])];
+
+    // Убираем недавние, текущий раунд И конфликтные
+    let available = pool.filter(t => !allExclude.includes(t.id) && !this.hasConflict(t, activeCurses));
+    if (!available.length) available = pool.filter(t => !allExclude.includes(t.id));
+    // Если excludeIds мешают — ослабляем только recent
+    if (!available.length) available = pool.filter(t => !excludeIds.includes(t.id) && !this.hasConflict(t, activeCurses));
+    if (!available.length) available = pool.filter(t => !excludeIds.includes(t.id));
     if (!available.length) available = pool.filter(t => !this.hasConflict(t, activeCurses));
     if (!available.length) available = pool;
     if (!available.length) return null;
 
-    return available[Math.floor(Math.random() * available.length)];
+    return this.weightedPick(available);
   }
 
-  getRandomCurse(activeCurseIds = []) {
-    const available = this.library.curses.filter(c => !activeCurseIds.includes(c.id));
-    const pool = available.length ? available : this.library.curses;
-    if (!pool.length) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
+  getRandomCurse(activeCurseIds = [], excludeIds = []) {
+    const allExclude = [...new Set([...activeCurseIds, ...excludeIds])];
+    let available = this.library.curses.filter(c => !allExclude.includes(c.id));
+    if (!available.length) available = this.library.curses.filter(c => !activeCurseIds.includes(c.id));
+    if (!available.length) available = this.library.curses;
+    if (!available.length) return null;
+    return this.weightedPick(available);
   }
 }
 

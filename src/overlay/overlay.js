@@ -19,7 +19,7 @@ function escapeHtml(value) {
 const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое' };
 const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', heavy: 'diff-heavy' };
 
-function renderTasks(activeTasks) {
+function renderTasks(activeTasks, titlesOnly) {
   if (!Array.isArray(activeTasks) || !activeTasks.length) {
     elements.tasks.innerHTML = '<div class="no-task">Нет заданий</div>';
     return;
@@ -30,19 +30,31 @@ function renderTasks(activeTasks) {
     const desc = task.description || '';
     const diff = task.difficulty || 'easy';
     const genMark = task.generated ? ' 🎲' : '';
+    const status = task.status || 'active';
+
+    let statusMark = '';
+    let rowClass = 'task-row';
+    if (status === 'completed') {
+      statusMark = '<span class="overlay-status overlay-status-done">✅</span>';
+      rowClass += ' task-row-done';
+    } else if (status === 'failed') {
+      statusMark = '<span class="overlay-status overlay-status-fail">❌</span>';
+      rowClass += ' task-row-fail';
+    }
+
     return `
-      <div class="task-row">
+      <div class="${rowClass}">
         <span class="diff-pill ${DIFF_CLASS[diff]}">${DIFF_LABEL[diff] || diff}${genMark}</span>
         <div class="task-info">
-          <span class="task-title">${escapeHtml(title)}</span>
-          ${desc ? `<span class="task-desc">${escapeHtml(desc)}</span>` : ''}
+          <span class="task-title">${escapeHtml(title)}${statusMark}</span>
+          ${(!titlesOnly && desc) ? `<span class="task-desc">${escapeHtml(desc)}</span>` : ''}
         </div>
       </div>
     `;
   }).join('');
 }
 
-function renderCurses(activeCurses) {
+function renderCurses(activeCurses, titlesOnly) {
   if (!Array.isArray(activeCurses) || !activeCurses.length) {
     elements.curses.innerHTML = '';
     elements.cursesEmpty.style.display = 'inline';
@@ -56,17 +68,46 @@ function renderCurses(activeCurses) {
     return `
       <div class="curse-pill">
         <span class="curse-pill-title">${escapeHtml(title)}</span>
-        ${desc ? `<span class="curse-pill-desc">${escapeHtml(desc)}</span>` : ''}
+        ${(!titlesOnly && desc) ? `<span class="curse-pill-desc">${escapeHtml(desc)}</span>` : ''}
       </div>
     `;
   }).join('');
 }
 
 function renderState(state) {
-  renderTasks(state.activeTasks || []);
+  const titlesOnly = !!(state.settings && state.settings.overlayTitlesOnly);
+  renderTasks(state.activeTasks || [], titlesOnly);
   elements.completed.textContent = String(state.completed ?? 0);
   elements.failed.textContent = String(state.failed ?? 0);
-  renderCurses(state.activeCurses || []);
+  renderCurses(state.activeCurses || [], titlesOnly);
+  autoScale();
+}
+
+// Авто-масштабирование: уменьшает шрифт пока контент не влезет
+function autoScale() {
+  const panel = document.querySelector('.panel');
+  if (!panel) return;
+  const container = document.documentElement;
+  const maxH = container.clientHeight;
+
+  // Сброс
+  panel.style.fontSize = '';
+
+  let fontSize = 14; // базовый px
+  panel.style.fontSize = fontSize + 'px';
+
+  // Уменьшаем шаг за шагом до минимума 9px
+  while (panel.scrollHeight > maxH && fontSize > 9) {
+    fontSize -= 0.5;
+    panel.style.fontSize = fontSize + 'px';
+  }
+
+  // Если всё равно не влезло — включаем скролл
+  if (panel.scrollHeight > maxH) {
+    panel.style.overflowY = 'auto';
+  } else {
+    panel.style.overflowY = 'visible';
+  }
 }
 
 function renderError(message) {
@@ -80,7 +121,8 @@ function serializeState(state) {
     activeTasks: state.activeTasks,
     activeCurses: state.activeCurses,
     completed: state.completed,
-    failed: state.failed
+    failed: state.failed,
+    settings: state.settings
   });
 }
 
@@ -112,3 +154,5 @@ window.addEventListener('DOMContentLoaded', async () => {
   await updateFromMain();
   setInterval(updateFromMain, 300);
 });
+
+window.addEventListener('resize', autoScale);

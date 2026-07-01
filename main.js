@@ -274,7 +274,7 @@ function makeUid() {
 }
 
 // Выбирает одно задание заданной сложности (50/50 генератор/рукописное если включён)
-function pickOneTask(difficulty, activeCurses) {
+function pickOneTask(difficulty, activeCurses, excludeIds = []) {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
 
   if (genEnabled) {
@@ -293,16 +293,16 @@ function pickOneTask(difficulty, activeCurses) {
     }
   }
 
-  // Рукописное
+  // Рукописное — excludeIds = история последних 2 раундов + уже выбранные в этом раунде
   const recentIds = stateManager.getPublicState().recentTaskIds;
-  const task = taskManager.getRandomTask(recentIds, activeCurses, difficulty);
+  const task = taskManager.getRandomTask(recentIds, activeCurses, difficulty, excludeIds);
   if (task) {
     stateManager.addRecentTask(task.id);
     return { ...task, uid: makeUid() };
   }
 
   // Fallback: без фильтра по difficulty
-  const taskAny = taskManager.getRandomTask(recentIds, activeCurses);
+  const taskAny = taskManager.getRandomTask(recentIds, activeCurses, null, excludeIds);
   if (taskAny) {
     stateManager.addRecentTask(taskAny.id);
     return { ...taskAny, uid: makeUid() };
@@ -312,25 +312,38 @@ function pickOneTask(difficulty, activeCurses) {
 }
 
 // Формирует раунд: 1 easy + 2 случайных любой сложности
+// Дедупликация: задания не повторяются внутри раунда и не берутся из 2 предыдущих раундов
 function buildRound() {
   const activeCurses = getActiveCurseObjects();
+  // id из последних 2 раундов
+  const historyIds = stateManager.getRecentRoundIds();
   const tasks = [];
+  const pickedIds = []; // id уже выбранных в текущем раунде
 
-  const easyTask = pickOneTask('easy', activeCurses);
-  if (easyTask) tasks.push(easyTask);
+  const tryPick = (difficulty) => {
+    const exclude = [...historyIds, ...pickedIds];
+    const t = pickOneTask(difficulty, activeCurses, exclude);
+    if (t) {
+      tasks.push(t);
+      if (Number.isFinite(t.id) && t.id !== -1) pickedIds.push(t.id);
+    }
+  };
 
-  // 2 рандомных (любая сложность)
+  tryPick('easy');
+
   const difficulties = ['easy', 'medium', 'heavy'];
   for (let i = 0; i < 2; i++) {
     const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
-    const t = pickOneTask(diff, activeCurses);
-    if (t) tasks.push(t);
+    tryPick(diff);
   }
+
+  // Сохраняем текущий раунд в историю
+  stateManager.pushRoundHistory(pickedIds);
 
   return tasks;
 }
 
-// Выбирает следующее наказание
+// Выбирает следующее наказание (без дублей активных)
 function pickNextCurse() {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
   const activeCurseIds = stateManager.getActiveCurseIds();
@@ -350,7 +363,8 @@ function pickNextCurse() {
     }
   }
 
-  const curse = taskManager.getRandomCurse(activeCurseIds);
+  // excludeIds = уже активные наказания (дедупликация)
+  const curse = taskManager.getRandomCurse(activeCurseIds, activeCurseIds);
   if (curse) stateManager.addActiveCurse(curse.id);
 }
 
