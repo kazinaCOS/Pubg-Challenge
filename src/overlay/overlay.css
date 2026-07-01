@@ -1,0 +1,90 @@
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+body {
+  pointer-events: none;
+}
+
+.overlay {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+}
+
+.panel {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 620px;
+  padding: 14px 16px;
+  background: rgba(8, 10, 14, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 18px;
+  color: #ffffff;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(10px);
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  line-height: 1.35;
+}
+
+.badge {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.task-badge {
+  background: rgba(255, 213, 74, 0.18);
+  color: #ffe58a;
+}
+
+.punishment-badge {
+  background: rgba(255, 127, 127, 0.18);
+  color: #ffb0b0;
+}
+
+.content {
+  font-size: 15px;
+  color: #f3f6fb;
+  word-break: break-word;
+}
+
+.curse-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 100px;
+}
+
+.curse-pill {
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 127, 127, 0.12);
+  color: #ffd3d3;
+  font-size: 14px;
+}
+
+.stats {
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mini {
+  font-size: 13px;
+  color: #d9e0ea;
+}

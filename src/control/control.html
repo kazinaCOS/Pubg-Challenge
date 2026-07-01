@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PUBG Challenge Control</title>
+  <link rel="stylesheet" href="control.css">
+</head>
+<body>
+  <main class="app">
+    <header class="header">
+      <h1>PUBG Challenge</h1>
+      <p class="subtitle">Control Window</p>
+    </header>
+
+    <section class="buttons">
+      <button id="btn-new-task" class="primary">🎲 Новое задание</button>
+      <button id="btn-complete" class="success">✅ Выполнено</button>
+      <button id="btn-fail" class="danger">❌ Провалено</button>
+      <button id="btn-editor">📝 Редактор</button>
+      <button id="btn-settings" class="secondary">⚙ Настройки</button>
+    </section>
+
+    <section class="info">
+      <article class="card">
+        <div class="label">Текущее задание</div>
+        <div id="current-task" class="value">Нет задания</div>
+      </article>
+
+      <article class="card">
+        <div class="label">Активные наказания</div>
+        <div id="active-curses" class="curse-list">Нет активных наказаний</div>
+      </article>
+
+      <article class="stats-grid">
+        <div class="stat">
+          <span class="label">Выполнено</span>
+          <span id="completed" class="value">0</span>
+        </div>
+        <div class="stat">
+          <span class="label">Провалено</span>
+          <span id="failed" class="value">0</span>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <div id="settings-modal" class="modal">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>Настройки</h2>
+
+      <label class="field">
+        <span>Позиция Overlay X</span>
+        <input id="overlay-x" type="number" step="1">
+      </label>
+
+      <label class="field">
+        <span>Позиция Overlay Y</span>
+        <input id="overlay-y" type="number" step="1">
+      </label>
+
+      <div class="modal-actions">
+        <button id="btn-save-settings" class="primary">💾 Сохранить</button>
+        <button id="btn-reset-progress" class="danger">🗑 Сбросить прогресс</button>
+        <button id="btn-close-settings" class="secondary">✖ Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="control.js"></script>
+</body>
+</html>

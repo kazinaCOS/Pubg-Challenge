@@ -1,0 +1,91 @@
+html, body {
+  margin: 0;
+  width: 100%;
+  min-height: 100%;
+  background: #101214;
+  color: #f5f7fb;
+  font-family: Arial, sans-serif;
+}
+
+.editor {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar h1,
+.panel-head h2 {
+  margin: 0;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.item textarea {
+  flex: 1;
+  min-height: 74px;
+  resize: vertical;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #0f1319;
+  color: #f5f7fb;
+  font-size: 14px;
+  outline: none;
+}
+
+button {
+  border: 0;
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #0c0f14;
+  background: #dbe2ea;
+  cursor: pointer;
+}
+
+button.primary {
+  background: linear-gradient(180deg, #ffd54a 0%, #f2b600 100%);
+}
+
+button.danger {
+  background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%);
+}

@@ -1,0 +1,39 @@
+{
+  "name": "pubg-challenge-overlay",
+  "version": "0.1.0",
+  "description": "PUBG Challenge Overlay",
+  "main": "main.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.pubg.challenge.overlay",
+    "productName": "PUBG Challenge Overlay",
+    "asar": true,
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "src/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

@@ -1,0 +1,171 @@
+const stateElements = {
+  currentTask: document.getElementById('current-task'),
+  activeCurses: document.getElementById('active-curses'),
+  completed: document.getElementById('completed'),
+  failed: document.getElementById('failed')
+};
+
+const buttons = {
+  newTask: document.getElementById('btn-new-task'),
+  complete: document.getElementById('btn-complete'),
+  fail: document.getElementById('btn-fail'),
+  editor: document.getElementById('btn-editor'),
+  settings: document.getElementById('btn-settings'),
+  saveSettings: document.getElementById('btn-save-settings'),
+  resetProgress: document.getElementById('btn-reset-progress'),
+  closeSettings: document.getElementById('btn-close-settings')
+};
+
+const modal = document.getElementById('settings-modal');
+const modalBackdrop = document.querySelector('.modal-backdrop');
+
+const settingsInputs = {
+  overlayX: document.getElementById('overlay-x'),
+  overlayY: document.getElementById('overlay-y')
+};
+
+function textOrFallback(value, fallback) {
+  if (!value) {
+    return fallback;
+  }
+
+  if (typeof value === 'object') {
+    return value.text || fallback;
+  }
+
+  return String(value);
+}
+
+function renderCurses(activeCurses) {
+  if (!Array.isArray(activeCurses) || !activeCurses.length) {
+    stateElements.activeCurses.textContent = 'Нет активных наказаний';
+    return;
+  }
+
+  stateElements.activeCurses.innerHTML = activeCurses.map((curse) => `
+    <div class="curse-item">
+      <div class="curse-text">${escapeHtml(curse.text)}</div>
+      <button class="curse-close danger" data-curse-id="${curse.id}">Закрыть</button>
+    </div>
+  `).join('');
+
+  Array.from(stateElements.activeCurses.querySelectorAll('[data-curse-id]')).forEach((button) => {
+    button.addEventListener('click', async () => {
+      const curseId = Number(button.getAttribute('data-curse-id'));
+      const state = await window.electronAPI.clearCurse(curseId);
+      renderState(state);
+    });
+  });
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+function renderState(state) {
+  if (!state) {
+    return;
+  }
+
+  stateElements.currentTask.textContent = textOrFallback(state.currentTask, 'Нет задания');
+  stateElements.completed.textContent = String(state.completed ?? 0);
+  stateElements.failed.textContent = String(state.failed ?? 0);
+  renderCurses(state.activeCurses || []);
+
+  const settings = state.settings || {};
+  settingsInputs.overlayX.value = Number.isFinite(settings.overlayX) ? settings.overlayX : 20;
+  settingsInputs.overlayY.value = Number.isFinite(settings.overlayY) ? settings.overlayY : 20;
+}
+
+async function refreshState() {
+  const state = await window.electronAPI.getState();
+  renderState(state);
+}
+
+function openSettings() {
+  modal.classList.add('open');
+}
+
+function closeSettings() {
+  modal.classList.remove('open');
+}
+
+function getSettingsPayload() {
+  return {
+    overlayX: Number(settingsInputs.overlayX.value),
+    overlayY: Number(settingsInputs.overlayY.value)
+  };
+}
+
+async function saveSettings() {
+  const state = await window.electronAPI.updateSettings(getSettingsPayload());
+  renderState(state);
+  closeSettings();
+}
+
+async function resetProgress() {
+  const result = await window.electronAPI.resetProgress();
+  if (result && result.state) {
+    renderState(result.state);
+  }
+}
+
+async function initialize() {
+  buttons.newTask.addEventListener('click', async () => {
+    const state = await window.electronAPI.newTask();
+    renderState(state);
+  });
+
+  buttons.complete.addEventListener('click', async () => {
+    const state = await window.electronAPI.completeTask();
+    renderState(state);
+  });
+
+  buttons.fail.addEventListener('click', async () => {
+    const state = await window.electronAPI.failTask();
+    renderState(state);
+  });
+
+  buttons.editor.addEventListener('click', async () => {
+    await window.electronAPI.openEditor();
+  });
+
+  buttons.settings.addEventListener('click', () => {
+    openSettings();
+  });
+
+  buttons.closeSettings.addEventListener('click', () => {
+    closeSettings();
+  });
+
+  buttons.saveSettings.addEventListener('click', async () => {
+    await saveSettings();
+  });
+
+  buttons.resetProgress.addEventListener('click', async () => {
+    await resetProgress();
+  });
+
+  if (modalBackdrop) {
+    modalBackdrop.addEventListener('click', () => {
+      closeSettings();
+    });
+  }
+
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      closeSettings();
+    }
+  });
+
+  await refreshState();
+  setInterval(refreshState, 700);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
+  await initialize();
+});
