@@ -420,8 +420,75 @@ function previewGenerate() {
 // ─── Автосохранение ──────────────────────────────────────────────────────────
 let _autoSaveTimer = null;
 
+// Патчит library из DOM без уничтожения отфильтрованных (невидимых) элементов.
+// Для каждого видимого элемента обновляет соответствующую запись в library по id.
+function patchLibraryFromDOM() {
+  // Tasks
+  tasksList.querySelectorAll('.item[data-type="task"]').forEach(row => {
+    const id = Number(row.dataset.id);
+    const item = library.tasks.find(t => t.id === id);
+    if (!item) return;
+    item.title = row.querySelector('input[data-field="title"]').value.trim();
+    item.description = row.querySelector('textarea[data-field="description"]').value.trim();
+    const tagsRaw = row.querySelector('input[data-field="tags"]').value.trim();
+    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl = row.querySelector('select[data-field="difficulty"]');
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+
+  // Curses
+  cursesList.querySelectorAll('.item[data-type="curse"]').forEach(row => {
+    const id = Number(row.dataset.id);
+    const item = library.curses.find(c => c.id === id);
+    if (!item) return;
+    item.title = row.querySelector('input[data-field="title"]').value.trim();
+    item.description = row.querySelector('textarea[data-field="description"]').value.trim();
+    const tagsRaw = row.querySelector('input[data-field="tags"]').value.trim();
+    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl = row.querySelector('select[data-field="difficulty"]');
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+
+  // Templates (task)
+  templatesList.querySelectorAll('.item[data-tmpl-id]').forEach(row => {
+    const id = Number(row.getAttribute('data-tmpl-id'));
+    const item = library.templates.find(t => t.id === id);
+    if (!item) return;
+    item.title = row.querySelector('input[data-tmpl-field="title"]').value.trim();
+    item.description = row.querySelector('textarea[data-tmpl-field="description"]').value.trim();
+    const tagsRaw = row.querySelector('input[data-tmpl-field="tags"]').value.trim();
+    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl = row.querySelector('select[data-tmpl-field="difficulty"]');
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+
+  // CurseTemplates
+  curseTemplatesList.querySelectorAll('.item[data-ctmpl-id]').forEach(row => {
+    const id = Number(row.getAttribute('data-ctmpl-id'));
+    if (!library.curseTemplates) library.curseTemplates = [];
+    const item = library.curseTemplates.find(t => t.id === id);
+    if (!item) return;
+    item.title = row.querySelector('input[data-ctmpl-field="title"]').value.trim();
+    item.description = row.querySelector('textarea[data-ctmpl-field="description"]').value.trim();
+    const tagsRaw = row.querySelector('input[data-ctmpl-field="tags"]').value.trim();
+    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl = row.querySelector('select[data-ctmpl-field="difficulty"]');
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+
+  // Pools (всегда полный список в DOM)
+  library.pools = collectPools();
+
+  // difficultyWeights
+  library.difficultyWeights = collectDifficultyWeights('task');
+  library.curseDifficultyWeights = collectDifficultyWeights('curse');
+
+  // generatorEnabled
+  if (generatorToggle) library.generatorEnabled = generatorToggle.checked;
+}
+
 async function autoSave() {
-  collectAll();
+  patchLibraryFromDOM();
   await window.electronAPI.saveLibrary(library);
   showToast('Сохранено ✓');
 }
@@ -431,7 +498,7 @@ function scheduleAutoSave() {
   _autoSaveTimer = setTimeout(autoSave, 500);
 }
 
-// Навешивает автосохранение на контейнер: input/change на полях, click на удаление
+// Навешивает автосохранение на контейнер
 function bindAutoSave(container) {
   container.addEventListener('input', scheduleAutoSave);
   container.addEventListener('change', scheduleAutoSave);
