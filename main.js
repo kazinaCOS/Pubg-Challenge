@@ -25,6 +25,7 @@ function ensureUserDataFiles() {
   const bundledStatePath = path.join(__dirname, 'src', 'data', 'state.json');
   const bundledTasksPath = path.join(__dirname, 'src', 'data', 'tasks.json');
 
+  // state.json — только создаём если нет
   if (!fs.existsSync(targetStatePath)) {
     if (fs.existsSync(bundledStatePath)) {
       fs.copyFileSync(bundledStatePath, targetStatePath);
@@ -40,15 +41,52 @@ function ensureUserDataFiles() {
     }
   }
 
+  // tasks.json — создаём если нет, или мигрируем если не хватает полей
   if (!fs.existsSync(targetTasksPath)) {
     if (fs.existsSync(bundledTasksPath)) {
       fs.copyFileSync(bundledTasksPath, targetTasksPath);
     } else {
-      fs.writeFileSync(targetTasksPath, JSON.stringify({ tasks: [], curses: [], generatorEnabled: false }, null, 2), 'utf8');
+      fs.writeFileSync(targetTasksPath, JSON.stringify({ tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [] }, null, 2), 'utf8');
     }
+  } else {
+    migrateTasksFile(targetTasksPath, bundledTasksPath);
   }
 
   return { statePath: targetStatePath, tasksPath: targetTasksPath };
+}
+
+// Добавляет недостающие поля pools/templates из bundled-файла, не трогая пользовательские задания
+function migrateTasksFile(targetPath, bundledPath) {
+  try {
+    const raw = fs.readFileSync(targetPath, 'utf8');
+    const data = JSON.parse(raw);
+
+    let changed = false;
+
+    // Если нет pools или templates — подтягиваем из bundled
+    if (!data.pools || !data.templates) {
+      if (fs.existsSync(bundledPath)) {
+        const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+        if (!data.pools) {
+          data.pools = bundled.pools || {};
+          changed = true;
+        }
+        if (!data.templates) {
+          data.templates = bundled.templates || [];
+          changed = true;
+        }
+      } else {
+        if (!data.pools) { data.pools = {}; changed = true; }
+        if (!data.templates) { data.templates = []; changed = true; }
+      }
+    }
+
+    if (changed) {
+      fs.writeFileSync(targetPath, JSON.stringify(data, null, 2), 'utf8');
+    }
+  } catch (_e) {
+    // Если файл битый — не трогаем, TaskManager сам восстановит
+  }
 }
 
 function getDataPaths() {
