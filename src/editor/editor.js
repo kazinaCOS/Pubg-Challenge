@@ -1,24 +1,26 @@
 'use strict';
 
 // ─── Состояние ───────────────────────────────────────────────────────────────
-let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [] };
+let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [] };
 
 // ─── DOM-узлы ────────────────────────────────────────────────────────────────
-const tasksList      = document.getElementById('tasks-list');
-const cursesList     = document.getElementById('curses-list');
-const templatesList  = document.getElementById('templates-list');
-const poolsList      = document.getElementById('pools-list');
-const previewOutput  = document.getElementById('preview-output');
-const generatorToggle = document.getElementById('generator-toggle');
+const tasksList           = document.getElementById('tasks-list');
+const cursesList          = document.getElementById('curses-list');
+const templatesList       = document.getElementById('templates-list');
+const curseTemplatesList  = document.getElementById('curse-templates-list');
+const poolsList           = document.getElementById('pools-list');
+const previewOutput       = document.getElementById('preview-output');
+const generatorToggle     = document.getElementById('generator-toggle');
 
-const btnAddTask     = document.getElementById('btn-add-task');
-const btnAddCurse    = document.getElementById('btn-add-curse');
-const btnAddTemplate = document.getElementById('btn-add-template');
-const btnAddPool     = document.getElementById('btn-add-pool');
-const btnSaveAll     = document.getElementById('btn-save-all');
-const btnExport      = document.getElementById('btn-export');
-const btnImport      = document.getElementById('btn-import');
-const btnPreview     = document.getElementById('btn-preview');
+const btnAddTask          = document.getElementById('btn-add-task');
+const btnAddCurse         = document.getElementById('btn-add-curse');
+const btnAddTemplate      = document.getElementById('btn-add-template');
+const btnAddCurseTemplate = document.getElementById('btn-add-curse-template');
+const btnAddPool          = document.getElementById('btn-add-pool');
+const btnSaveAll          = document.getElementById('btn-save-all');
+const btnExport           = document.getElementById('btn-export');
+const btnImport           = document.getElementById('btn-import');
+const btnPreview          = document.getElementById('btn-preview');
 
 // ─── Вкладки ─────────────────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(btn => {
@@ -40,6 +42,10 @@ function esc(v) {
 function nextId(items) {
   const ids = items.map(i => i.id).filter(Number.isFinite);
   return ids.length ? Math.max(...ids) + 1 : 1;
+}
+
+function allIds() {
+  return [...library.tasks, ...library.curses, ...library.templates, ...(library.curseTemplates || [])];
 }
 
 function randFrom(arr) {
@@ -82,7 +88,7 @@ function collectItemList(container, type) {
   container.querySelectorAll(`.item[data-type="${type}"]`).forEach(row => {
     const id = Number(row.dataset.id);
     const title = row.querySelector(`input[data-field="title"]`).value.trim();
-    const desc = row.querySelector(`textarea[data-field="description"]`).value.trim();
+    const desc  = row.querySelector(`textarea[data-field="description"]`).value.trim();
     const tagsRaw = row.querySelector(`input[data-field="tags"]`).value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     if (!title && !desc) return;
@@ -91,44 +97,56 @@ function collectItemList(container, type) {
   return result;
 }
 
-// ─── Рендер: шаблоны ─────────────────────────────────────────────────────────
-function renderTemplates() {
-  const items = library.templates;
+// ─── Рендер: шаблоны (общий для заданий и наказаний) ────────────────────────
+function renderTemplateList(container, items, dataAttr, deleteFn) {
   if (!items.length) {
-    templatesList.innerHTML = `<div class="empty-hint">Нет шаблонов. Нажми «+ Добавить».</div>`;
+    container.innerHTML = `<div class="empty-hint">Нет шаблонов. Нажми «+ Добавить».</div>`;
     return;
   }
-  templatesList.innerHTML = items.map(item => `
-    <div class="item" data-tmpl-id="${item.id}">
+  container.innerHTML = items.map(item => `
+    <div class="item" data-${dataAttr}-id="${item.id}">
       <div class="item-fields">
-        <input class="item-title" type="text" data-tmpl-field="title" data-tmpl-id="${item.id}"
-          placeholder="Название шаблона — можно {пул}" value="${esc(item.title || '')}">
-        <textarea class="item-desc" data-tmpl-field="description" data-tmpl-id="${item.id}"
-          placeholder="Описание шаблона — можно {пул}" rows="2">${esc(item.description || '')}</textarea>
-        <input class="item-tags" type="text" data-tmpl-field="tags" data-tmpl-id="${item.id}"
+        <input class="item-title" type="text" data-${dataAttr}-field="title" data-${dataAttr}-id="${item.id}"
+          placeholder="Название — можно {пул}" value="${esc(item.title || '')}">
+        <textarea class="item-desc" data-${dataAttr}-field="description" data-${dataAttr}-id="${item.id}"
+          placeholder="Описание — можно {пул}" rows="2">${esc(item.description || '')}</textarea>
+        <input class="item-tags" type="text" data-${dataAttr}-field="tags" data-${dataAttr}-id="${item.id}"
           placeholder="Теги (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
       </div>
-      <button class="danger btn-delete-tmpl" data-tmpl-id="${item.id}">✕</button>
+      <button class="danger btn-del-tmpl" data-${dataAttr}-del="${item.id}">✕</button>
     </div>
   `).join('');
 
-  templatesList.querySelectorAll('.btn-delete-tmpl').forEach(btn => {
+  container.querySelectorAll('.btn-del-tmpl').forEach(btn => {
     btn.addEventListener('click', () => {
-      const id = Number(btn.dataset.tmplId);
-      library.templates = library.templates.filter(t => t.id !== id);
-      renderTemplates();
+      const id = Number(btn.getAttribute(`data-${dataAttr}-del`));
+      deleteFn(id);
     });
   });
 }
 
-function collectTemplates() {
+function renderTemplates() {
+  renderTemplateList(templatesList, library.templates, 'tmpl', id => {
+    library.templates = library.templates.filter(t => t.id !== id);
+    renderTemplates();
+  });
+}
+
+function renderCurseTemplates() {
+  renderTemplateList(curseTemplatesList, library.curseTemplates || [], 'ctmpl', id => {
+    library.curseTemplates = (library.curseTemplates || []).filter(t => t.id !== id);
+    renderCurseTemplates();
+  });
+}
+
+function collectTemplateList(container, dataAttr) {
   const result = [];
-  templatesList.querySelectorAll('.item[data-tmpl-id]').forEach(row => {
-    const id = Number(row.dataset.tmplId);
-    const title = row.querySelector(`input[data-tmpl-field="title"]`).value.trim();
-    const desc = row.querySelector(`textarea[data-tmpl-field="description"]`).value.trim();
-    const tagsRaw = row.querySelector(`input[data-tmpl-field="tags"]`).value.trim();
+  container.querySelectorAll(`.item[data-${dataAttr}-id]`).forEach(row => {
+    const id = Number(row.getAttribute(`data-${dataAttr}-id`));
+    const title = row.querySelector(`input[data-${dataAttr}-field="title"]`).value.trim();
+    const desc  = row.querySelector(`textarea[data-${dataAttr}-field="description"]`).value.trim();
+    const tagsRaw = row.querySelector(`input[data-${dataAttr}-field="tags"]`).value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     if (!title && !desc) return;
     result.push({ id, title, description: desc, tags });
@@ -167,22 +185,16 @@ function renderPools() {
     </div>
   `).join('');
 
-  // Удалить пул
   poolsList.querySelectorAll('.btn-delete-pool').forEach(btn => {
-    btn.addEventListener('click', () => {
-      delete library.pools[btn.dataset.poolKey];
-      renderPools();
-    });
+    btn.addEventListener('click', () => { delete library.pools[btn.dataset.poolKey]; renderPools(); });
   });
 
-  // Добавить значение в пул
   poolsList.querySelectorAll('.btn-add-val').forEach(btn => {
     btn.addEventListener('click', () => {
       const key = btn.dataset.poolKey;
       if (!library.pools[key]) library.pools[key] = [];
       library.pools[key].push('');
       renderPools();
-      // Фокус на последнее поле
       const card = poolsList.querySelector(`.pool-card[data-pool-key="${key}"]`);
       if (card) {
         const inputs = card.querySelectorAll('.pool-value-input');
@@ -191,12 +203,9 @@ function renderPools() {
     });
   });
 
-  // Удалить значение из пула
   poolsList.querySelectorAll('.btn-delete-val').forEach(btn => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.poolKey;
-      const idx = Number(btn.dataset.valIdx);
-      library.pools[key].splice(idx, 1);
+      library.pools[btn.dataset.poolKey].splice(Number(btn.dataset.valIdx), 1);
       renderPools();
     });
   });
@@ -223,48 +232,50 @@ function render() {
   renderItemList(tasksList, library.tasks, 'task');
   renderItemList(cursesList, library.curses, 'curse');
   renderTemplates();
+  renderCurseTemplates();
   renderPools();
   if (generatorToggle) generatorToggle.checked = library.generatorEnabled === true;
 }
 
 // ─── Сбор всего перед сохранением ────────────────────────────────────────────
 function collectAll() {
-  const tasks = collectItemList(tasksList, 'task');
-  const curses = collectItemList(cursesList, 'curse');
-  const templates = collectTemplates();
-  const pools = collectPools();
+  const tasks          = collectItemList(tasksList, 'task');
+  const curses         = collectItemList(cursesList, 'curse');
+  const templates      = collectTemplateList(templatesList, 'tmpl');
+  const curseTemplates = collectTemplateList(curseTemplatesList, 'ctmpl');
+  const pools          = collectPools();
 
-  // Переназначаем id если нужно
   const fixIds = (items, offset = 0) => items.map((item, i) => ({
     ...item,
     id: Number.isFinite(item.id) && item.id > 0 ? item.id : offset + i + 1
   }));
 
-  const fixedTasks = fixIds(tasks);
-  const maxTaskId = fixedTasks.reduce((m, i) => Math.max(m, i.id), 0);
-  const fixedCurses = fixIds(curses, maxTaskId);
-  const maxCurseId = fixedCurses.reduce((m, i) => Math.max(m, i.id), maxTaskId);
-  const fixedTemplates = fixIds(templates, maxCurseId);
+  const fixedTasks         = fixIds(tasks);
+  const maxTaskId          = fixedTasks.reduce((m, i) => Math.max(m, i.id), 0);
+  const fixedCurses        = fixIds(curses, maxTaskId);
+  const maxCurseId         = fixedCurses.reduce((m, i) => Math.max(m, i.id), maxTaskId);
+  const fixedTemplates     = fixIds(templates, maxCurseId);
+  const maxTmplId          = fixedTemplates.reduce((m, i) => Math.max(m, i.id), maxCurseId);
+  const fixedCurseTmpls    = fixIds(curseTemplates, maxTmplId);
 
   library = {
     tasks: fixedTasks,
     curses: fixedCurses,
     generatorEnabled: generatorToggle ? generatorToggle.checked : library.generatorEnabled,
     pools,
-    templates: fixedTemplates
+    templates: fixedTemplates,
+    curseTemplates: fixedCurseTmpls
   };
 }
 
 // ─── Превью генератора ────────────────────────────────────────────────────────
 function previewGenerate() {
-  // Собираем актуальное состояние без сохранения на диск
   collectAll();
-
   const templates = library.templates;
-  const pools = library.pools;
+  const pools     = library.pools;
 
   if (!templates.length) {
-    previewOutput.textContent = 'Нет шаблонов — добавь хотя бы один.';
+    previewOutput.textContent = 'Нет шаблонов заданий — добавь хотя бы один.';
     return;
   }
 
@@ -272,12 +283,12 @@ function previewGenerate() {
 
   const fill = str => str.replace(/\{([^}]+)\}/g, (match, key) => {
     const pool = pools[key];
-    if (!pool || !pool.length) return `[${key}?]`; // подсказка что пул не найден
+    if (!pool || !pool.length) return `[${key}?]`;
     return randFrom(pool);
   });
 
   const title = fill(template.title);
-  const desc = fill(template.description);
+  const desc  = fill(template.description);
 
   previewOutput.innerHTML = `
     <div class="preview-title">${esc(title)}</div>
@@ -289,30 +300,37 @@ function previewGenerate() {
 // ─── Загрузка ─────────────────────────────────────────────────────────────────
 async function loadLibrary() {
   library = await window.electronAPI.getLibrary();
+  if (!library.curseTemplates) library.curseTemplates = [];
   render();
 }
 
 // ─── Кнопки ──────────────────────────────────────────────────────────────────
 btnAddTask.addEventListener('click', () => {
-  library.tasks.push({ id: nextId(library.tasks), title: '', description: '', tags: [] });
+  library.tasks.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
   renderItemList(tasksList, library.tasks, 'task');
   const inputs = tasksList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
 
 btnAddCurse.addEventListener('click', () => {
-  const allIds = [...library.tasks, ...library.curses];
-  library.curses.push({ id: nextId(allIds), title: '', description: '', tags: [] });
+  library.curses.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
   renderItemList(cursesList, library.curses, 'curse');
   const inputs = cursesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
 
 btnAddTemplate.addEventListener('click', () => {
-  const allIds = [...library.tasks, ...library.curses, ...library.templates];
-  library.templates.push({ id: nextId(allIds), title: '', description: '', tags: [] });
+  library.templates.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
   renderTemplates();
   const inputs = templatesList.querySelectorAll('.item-title');
+  if (inputs.length) inputs[inputs.length - 1].focus();
+});
+
+btnAddCurseTemplate.addEventListener('click', () => {
+  if (!library.curseTemplates) library.curseTemplates = [];
+  library.curseTemplates.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
+  renderCurseTemplates();
+  const inputs = curseTemplatesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
 
@@ -320,7 +338,6 @@ btnAddPool.addEventListener('click', () => {
   const key = `новый_пул_${Date.now()}`;
   library.pools[key] = [];
   renderPools();
-  // Фокус на имя нового пула
   const cards = poolsList.querySelectorAll('.pool-card');
   if (cards.length) {
     const lastInput = cards[cards.length - 1].querySelector('.pool-name-input');
@@ -332,6 +349,7 @@ btnSaveAll.addEventListener('click', async () => {
   collectAll();
   const result = await window.electronAPI.saveLibrary(library);
   library = result.library;
+  if (!library.curseTemplates) library.curseTemplates = [];
   render();
   showToast('Сохранено ✓');
 });
@@ -346,6 +364,7 @@ btnImport.addEventListener('click', async () => {
   const result = await window.electronAPI.importLibrary();
   if (result.ok) {
     library = result.library;
+    if (!library.curseTemplates) library.curseTemplates = [];
     render();
     showToast('Импортировано ✓');
   }

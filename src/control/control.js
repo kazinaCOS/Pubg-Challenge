@@ -59,18 +59,22 @@ function renderCurses(activeCurses) {
   stateElements.activeCurses.innerHTML = activeCurses.map(curse => {
     const title = curse.title || curse.text || '';
     const desc = curse.description || '';
+    // Сгенерированные наказания идентифицируются по genId, рукописные — по id
+    const removeKey = curse.genId || curse.id;
     return `
       <div class="curse-item">
         <div class="curse-title">${escapeHtml(title)}</div>
         ${desc ? `<div class="curse-desc">${escapeHtml(desc)}</div>` : ''}
-        <button class="curse-close danger" data-curse-id="${curse.id}">Закрыть</button>
+        <button class="curse-close danger" data-curse-id="${escapeHtml(String(removeKey))}">Закрыть</button>
       </div>
     `;
   }).join('');
 
   Array.from(stateElements.activeCurses.querySelectorAll('[data-curse-id]')).forEach(button => {
     button.addEventListener('click', async () => {
-      const curseId = Number(button.getAttribute('data-curse-id'));
+      const raw = button.getAttribute('data-curse-id');
+      // genId — строка вида 'gen_...', рукописное — число
+      const curseId = raw.startsWith('gen_') ? raw : Number(raw);
       const state = await window.electronAPI.clearCurse(curseId);
       renderState(state);
     });

@@ -13,7 +13,8 @@ class TaskManager {
       curses: [],
       generatorEnabled: false,
       pools: {},
-      templates: []
+      templates: [],
+      curseTemplates: []
     };
   }
 
@@ -65,7 +66,8 @@ class TaskManager {
       curses: this.normalizeItems(data.curses),
       generatorEnabled: data.generatorEnabled === true,
       pools: this.normalizePools(data.pools),
-      templates: this.normalizeTemplates(data.templates)
+      templates: this.normalizeTemplates(data.templates),
+      curseTemplates: this.normalizeTemplates(data.curseTemplates)
     };
   }
 
@@ -98,7 +100,8 @@ class TaskManager {
       curses: this.library.curses.map(item => ({ ...item })),
       generatorEnabled: this.library.generatorEnabled,
       pools: JSON.parse(JSON.stringify(this.library.pools)),
-      templates: this.library.templates.map(item => ({ ...item }))
+      templates: this.library.templates.map(item => ({ ...item })),
+      curseTemplates: this.library.curseTemplates.map(item => ({ ...item }))
     };
   }
 
@@ -151,12 +154,22 @@ class TaskManager {
     const templates = this.library.templates;
     if (!templates.length) return null;
 
-    // Пробуем найти шаблон без конфликта
     let available = templates.filter(t => !this.hasConflict(t, activeCurses));
-    if (!available.length) available = templates; // если все конфликтуют — берём любой
+    if (!available.length) available = templates;
 
     const template = available[Math.floor(Math.random() * available.length)];
     return this.fillTemplate(template);
+  }
+
+  // Генерирует наказание из пула curseTemplates
+  getGeneratedCurse() {
+    const templates = this.library.curseTemplates;
+    if (!templates.length) return null;
+    const template = templates[Math.floor(Math.random() * templates.length)];
+    const filled = this.fillTemplate(template);
+    filled.generated = true;
+    filled.isCurse = true;
+    return filled;
   }
 
   getRandomTask(recentTaskIds = [], activeCurses = []) {

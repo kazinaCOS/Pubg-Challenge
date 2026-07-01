@@ -11,6 +11,7 @@ class StateManager {
     return {
       currentTaskId: null,
       activeCurseIds: [],
+      generatedCurses: [],   // сгенерированные наказания (полные объекты с genId)
       completed: 0,
       failed: 0,
       recentTaskIds: [],
@@ -41,6 +42,7 @@ class StateManager {
     return {
       currentTaskId: Number.isFinite(state.currentTaskId) ? state.currentTaskId : defaults.currentTaskId,
       activeCurseIds: Array.isArray(state.activeCurseIds) ? state.activeCurseIds.filter(Number.isFinite).slice(0, 3) : [],
+      generatedCurses: Array.isArray(state.generatedCurses) ? state.generatedCurses.slice(0, 3) : [],
       completed: Number.isFinite(state.completed) ? state.completed : defaults.completed,
       failed: Number.isFinite(state.failed) ? state.failed : defaults.failed,
       recentTaskIds: Array.isArray(state.recentTaskIds) ? state.recentTaskIds.filter(Number.isFinite).slice(0, 10) : [],
@@ -67,6 +69,9 @@ class StateManager {
       const raw = fs.readFileSync(this.statePath, 'utf8');
       const parsed = JSON.parse(raw);
       this.state = this.normalizeState(parsed);
+      // Восстанавливаем generatedTask и generatedCurses из файла
+      if (parsed.generatedTask) this.state.generatedTask = parsed.generatedTask;
+      if (Array.isArray(parsed.generatedCurses)) this.state.generatedCurses = parsed.generatedCurses.slice(0, 3);
     } catch (_error) {
       this.state = this.getDefaultState();
       await this.saveState();
@@ -78,6 +83,7 @@ class StateManager {
     return {
       currentTaskId: this.state.currentTaskId,
       activeCurseIds: this.state.activeCurseIds.slice(),
+      generatedCurses: (this.state.generatedCurses || []).slice(),
       completed: this.state.completed,
       failed: this.state.failed,
       recentTaskIds: this.state.recentTaskIds.slice(),
@@ -87,14 +93,16 @@ class StateManager {
 
   getResolvedState(taskManager) {
     const raw = this.getPublicState();
-    const activeCurses = raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
 
-    // Текущее задание — либо из библиотеки, либо из генератора (id === -1)
+    // Текущее задание
     let currentTask = taskManager.getTaskById(raw.currentTaskId) || null;
     if (!currentTask && raw.currentTaskId === -1) {
-      // Задание от генератора хранится в state как специальный объект
       currentTask = this.state.generatedTask || null;
     }
+
+    // Активные наказания = рукописные (по id) + сгенерированные (объекты)
+    const writtenCurses = raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
+    const activeCurses = [...writtenCurses, ...(this.state.generatedCurses || [])];
 
     return {
       currentTaskId: raw.currentTaskId,
@@ -110,9 +118,7 @@ class StateManager {
 
   setCurrentTask(taskId) {
     this.state.currentTaskId = Number.isFinite(taskId) ? taskId : null;
-    if (taskId !== -1) {
-      this.state.generatedTask = null;
-    }
+    if (taskId !== -1) this.state.generatedTask = null;
   }
 
   setGeneratedTask(task) {
@@ -124,33 +130,48 @@ class StateManager {
     if (!Number.isFinite(taskId) || taskId === -1) return;
     this.state.recentTaskIds = this.state.recentTaskIds.filter(id => id !== taskId);
     this.state.recentTaskIds.unshift(taskId);
-    if (this.state.recentTaskIds.length > 10) {
-      this.state.recentTaskIds.length = 10;
-    }
+    if (this.state.recentTaskIds.length > 10) this.state.recentTaskIds.length = 10;
   }
 
   incrementCompleted() { this.state.completed += 1; }
   incrementFailed() { this.state.failed += 1; }
 
+  // Рукописное наказание по id
   addActiveCurse(curseId) {
     if (!Number.isFinite(curseId)) return;
     if (this.state.activeCurseIds.includes(curseId)) return;
-    if (this.state.activeCurseIds.length >= 3) return;
+    if (this.getActiveCursesCount() >= 3) return;
     this.state.activeCurseIds.push(curseId);
   }
 
+  // Сгенерированное наказание (полный объект)
+  addGeneratedCurse(curse) {
+    if (!curse) return;
+    if (this.getActiveCursesCount() >= 3) return;
+    if (!this.state.generatedCurses) this.state.generatedCurses = [];
+    // Уникальный временной id для удаления
+    curse.genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    this.state.generatedCurses.push(curse);
+  }
+
+  // curseId — число (рукописное) или строка genId (сгенерированное)
   removeActiveCurse(curseId) {
-    this.state.activeCurseIds = this.state.activeCurseIds.filter(id => id !== curseId);
+    if (typeof curseId === 'string' && curseId.startsWith('gen_')) {
+      this.state.generatedCurses = (this.state.generatedCurses || []).filter(c => c.genId !== curseId);
+    } else {
+      this.state.activeCurseIds = this.state.activeCurseIds.filter(id => id !== curseId);
+    }
   }
 
   getActiveCurseIds() { return this.state.activeCurseIds.slice(); }
-  getActiveCursesCount() { return this.state.activeCurseIds.length; }
+
+  // Суммарное количество активных наказаний (рукописные + сгенерированные)
+  getActiveCursesCount() {
+    return this.state.activeCurseIds.length + (this.state.generatedCurses || []).length;
+  }
 
   updateSettings(newSettings = {}) {
-    this.state.settings = this.normalizeSettings({
-      ...this.state.settings,
-      ...newSettings
-    });
+    this.state.settings = this.normalizeSettings({ ...this.state.settings, ...newSettings });
   }
 
   resetProgress() {
@@ -178,11 +199,9 @@ class StateManager {
   async saveState() {
     const dir = path.dirname(this.statePath);
     fs.mkdirSync(dir, { recursive: true });
-    // Сохраняем generatedTask тоже (для восстановления после перезапуска)
     const toSave = { ...this.state };
-    if (this.state.generatedTask) {
-      toSave.generatedTask = this.state.generatedTask;
-    }
+    if (this.state.generatedTask) toSave.generatedTask = this.state.generatedTask;
+    if (this.state.generatedCurses) toSave.generatedCurses = this.state.generatedCurses;
     fs.writeFileSync(this.statePath, JSON.stringify(toSave, null, 2), 'utf8');
     return true;
   }

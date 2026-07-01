@@ -46,16 +46,25 @@
     <section class="tab-content" id="tab-generator">
       <div class="generator-layout">
 
-        <!-- Левая колонка: шаблоны -->
+        <!-- Левая колонка: шаблоны заданий + шаблоны наказаний -->
         <div class="gen-col">
           <div class="panel-head">
             <div>
-              <h2>Шаблоны</h2>
+              <h2>Шаблоны заданий</h2>
               <p class="hint">Используй <code>{имя_пула}</code> в названии или описании.<br>Пример: <code>Убить {количество} игроков с {оружие}</code></p>
             </div>
             <button id="btn-add-template">+ Добавить</button>
           </div>
           <div id="templates-list" class="list"></div>
+
+          <div class="panel-head" style="margin-top:18px">
+            <div>
+              <h2>Шаблоны наказаний</h2>
+              <p class="hint">Те же правила: <code>{имя_пула}</code> подставляется из пулов справа.</p>
+            </div>
+            <button id="btn-add-curse-template">+ Добавить</button>
+          </div>
+          <div id="curse-templates-list" class="list"></div>
         </div>
 
         <!-- Правая колонка: пулы -->

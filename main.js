@@ -55,37 +55,56 @@ function ensureUserDataFiles() {
   return { statePath: targetStatePath, tasksPath: targetTasksPath };
 }
 
-// Добавляет недостающие поля pools/templates из bundled-файла, не трогая пользовательские задания
+// Мигрирует userData/tasks.json: добавляет недостающие поля из bundled.
+// Правила:
+//   - tasks/curses: если массив пустой — копируем из bundled (пользователь ещё ничего не написал)
+//   - pools/templates: если поля отсутствуют — копируем из bundled
+//   - Если пользователь уже что-то написал (массив непустой) — не трогаем
 function migrateTasksFile(targetPath, bundledPath) {
   try {
     const raw = fs.readFileSync(targetPath, 'utf8');
     const data = JSON.parse(raw);
-
     let changed = false;
 
-    // Если нет pools или templates — подтягиваем из bundled
-    if (!data.pools || !data.templates) {
-      if (fs.existsSync(bundledPath)) {
-        const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
-        if (!data.pools) {
-          data.pools = bundled.pools || {};
-          changed = true;
-        }
-        if (!data.templates) {
-          data.templates = bundled.templates || [];
-          changed = true;
-        }
-      } else {
-        if (!data.pools) { data.pools = {}; changed = true; }
-        if (!data.templates) { data.templates = []; changed = true; }
+    if (fs.existsSync(bundledPath)) {
+      const bundled = JSON.parse(fs.readFileSync(bundledPath, 'utf8'));
+
+      // tasks: пустой массив → берём из bundled
+      if (!Array.isArray(data.tasks) || data.tasks.length === 0) {
+        data.tasks = bundled.tasks || [];
+        changed = true;
       }
+      // curses: пустой массив → берём из bundled
+      if (!Array.isArray(data.curses) || data.curses.length === 0) {
+        data.curses = bundled.curses || [];
+        changed = true;
+      }
+      // pools: поле отсутствует → берём из bundled
+      if (!data.pools || Object.keys(data.pools).length === 0) {
+        data.pools = bundled.pools || {};
+        changed = true;
+      }
+      // templates: поле отсутствует → берём из bundled
+      if (!Array.isArray(data.templates) || data.templates.length === 0) {
+        data.templates = bundled.templates || [];
+        changed = true;
+      }
+      // curseTemplates: поле отсутствует → берём из bundled
+      if (!Array.isArray(data.curseTemplates) || data.curseTemplates.length === 0) {
+        data.curseTemplates = bundled.curseTemplates || [];
+        changed = true;
+      }
+    } else {
+      // bundled недоступен — просто убеждаемся что поля существуют
+      if (!data.pools) { data.pools = {}; changed = true; }
+      if (!data.templates) { data.templates = []; changed = true; }
     }
 
     if (changed) {
       fs.writeFileSync(targetPath, JSON.stringify(data, null, 2), 'utf8');
     }
   } catch (_e) {
-    // Если файл битый — не трогаем, TaskManager сам восстановит
+    // Битый файл — не трогаем, TaskManager сам восстановит
   }
 }
 
@@ -242,6 +261,32 @@ function getActiveCurses() {
   return raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
 }
 
+// Выбирает следующее наказание: 50/50 рукописное или сгенерированное (если генератор включён)
+function pickNextCurse() {
+  const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
+  const activeCurseIds = stateManager.getActiveCurseIds();
+
+  if (genEnabled && taskManager.library.curses.length === 0) {
+    // Есть шаблоны — генерируем наказание
+    const gen = taskManager.getGeneratedCurse();
+    if (gen) stateManager.addGeneratedCurse(gen);
+    return;
+  }
+
+  if (genEnabled) {
+    const useGen = Math.random() < 0.5;
+    if (useGen) {
+      const gen = taskManager.getGeneratedCurse();
+      if (gen) stateManager.addGeneratedCurse(gen);
+      return;
+    }
+  }
+
+  // Рукописное наказание
+  const curse = taskManager.getRandomCurse(activeCurseIds);
+  if (curse) stateManager.addActiveCurse(curse.id);
+}
+
 function pickNextTask() {
   const state = stateManager.getPublicState();
   const activeCurses = getActiveCurses();
@@ -313,11 +358,7 @@ function registerHandlers() {
       stateManager.incrementFailed();
 
       if (stateManager.getActiveCursesCount() < 3) {
-        const activeCurses = getActiveCurses();
-        const availableCurse = taskManager.getRandomCurse(stateManager.getActiveCurseIds());
-        if (availableCurse) {
-          stateManager.addActiveCurse(availableCurse.id);
-        }
+        pickNextCurse();
       }
 
       pickNextTask();
