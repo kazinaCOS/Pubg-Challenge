@@ -17,46 +17,74 @@ function getUserDataDir() {
 
 function ensureUserDataFiles() {
   const userDataDir = getUserDataDir();
+  
   fs.mkdirSync(userDataDir, { recursive: true });
 
   const targetStatePath = path.join(userDataDir, 'state.json');
-  const targetTasksPath = path.join(userDataDir, 'tasks.json');
+  const targetTaskPackPath = path.join(userDataDir, 'task-pack.json');
 
   const bundledStatePath = path.join(__dirname, 'src', 'data', 'state.json');
-  const bundledTasksPath = path.join(__dirname, 'src', 'data', 'tasks.json');
+  const bundledTaskPackPath = path.join(__dirname, 'src', 'data', 'task-pack.json');
+  const legacyBundledTasksPath = path.join(__dirname, 'src', 'data', 'tasks.json');
+  
 
   if (!fs.existsSync(targetStatePath)) {
     if (fs.existsSync(bundledStatePath)) {
       fs.copyFileSync(bundledStatePath, targetStatePath);
     } else {
-      fs.writeFileSync(targetStatePath, JSON.stringify({
-        currentTaskId: null,
-        activeCurseIds: [],
-        completed: 0,
-        failed: 0,
-        recentTaskIds: [],
-        settings: {
-          overlayX: 20,
-          overlayY: 20
-        }
-      }, null, 2), 'utf8');
+      fs.writeFileSync(
+        targetStatePath,
+        JSON.stringify(
+          {
+            currentTaskId: null,
+            activeCurseIds: [],
+            completed: 0,
+            failed: 0,
+            recentTaskIds: [],
+            settings: {
+              overlayX: 20,
+              overlayY: 20
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
     }
   }
 
-  if (!fs.existsSync(targetTasksPath)) {
-    if (fs.existsSync(bundledTasksPath)) {
-      fs.copyFileSync(bundledTasksPath, targetTasksPath);
+  if (!fs.existsSync(targetTaskPackPath)) {
+    if (fs.existsSync(bundledTaskPackPath)) {
+      fs.copyFileSync(bundledTaskPackPath, targetTaskPackPath);
+    } else if (fs.existsSync(legacyBundledTasksPath)) {
+      fs.copyFileSync(legacyBundledTasksPath, targetTaskPackPath);
     } else {
-      fs.writeFileSync(targetTasksPath, JSON.stringify({
-        tasks: [],
-        curses: []
-      }, null, 2), 'utf8');
+      fs.writeFileSync(
+        targetTaskPackPath,
+        JSON.stringify(
+          {
+            version: 1,
+            name: 'Default PUBG Pack',
+            tasks: [],
+            curses: [],
+            generator: {
+              enabled: false,
+              weight: 0.35,
+              templates: []
+            }
+          },
+          null,
+          2
+        ),
+        'utf8'
+      );
     }
   }
 
   return {
     statePath: targetStatePath,
-    tasksPath: targetTasksPath
+    taskPackPath: targetTaskPackPath
   };
 }
 
@@ -69,7 +97,7 @@ function createStateManager() {
 }
 
 function createTaskManager() {
-  return new TaskManager(getDataPaths().tasksPath);
+  return new TaskManager(getDataPaths().taskPackPath);
 }
 
 function getPublicState() {
@@ -107,24 +135,24 @@ function createControlWindow() {
   controlWindow.loadFile(path.join(__dirname, 'src', 'control', 'control.html'));
 
   controlWindow.once('ready-to-show', () => {
-  controlWindow.show();
-});
+    controlWindow.show();
+  });
 
-controlWindow.on('close', () => {
-  if (editorWindow && !editorWindow.isDestroyed()) {
-    editorWindow.close();
-  }
+  controlWindow.on('close', () => {
+    if (editorWindow && !editorWindow.isDestroyed()) {
+      editorWindow.close();
+    }
 
-  if (overlayWindow && !overlayWindow.isDestroyed()) {
-    overlayWindow.close();
-  }
+    if (overlayWindow && !overlayWindow.isDestroyed()) {
+      overlayWindow.close();
+    }
 
-  app.quit();
-});
+    app.quit();
+  });
 
-controlWindow.on('closed', () => {
-  controlWindow = null;
-});
+  controlWindow.on('closed', () => {
+    controlWindow = null;
+  });
 }
 
 function createOverlayWindow() {

@@ -15,12 +15,28 @@ class TaskManager {
     };
   }
 
+  normalizeText(item) {
+    if (typeof item?.text === 'string' && item.text.trim()) {
+      return item.text.trim();
+    }
+
+    if (typeof item?.task === 'string' && item.task.trim()) {
+      return item.task.trim();
+    }
+
+    if (typeof item?.curse === 'string' && item.curse.trim()) {
+      return item.curse.trim();
+    }
+
+    return '';
+  }
+
   normalizeItems(items = []) {
     return items
       .filter((item) => item && typeof item === 'object')
       .map((item) => ({
         id: Number.isFinite(item.id) ? item.id : null,
-        text: typeof item.text === 'string' ? item.text.trim() : ''
+        text: this.normalizeText(item)
       }))
       .filter((item) => Number.isFinite(item.id) && item.text);
   }
