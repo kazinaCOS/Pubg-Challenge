@@ -27,6 +27,9 @@ const settingsInputs = {
   overlayHeight: document.getElementById('overlay-height')
 };
 
+// Флаг — пока настройки открыты, не перезаписываем поля из state
+let settingsOpen = false;
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -74,20 +77,23 @@ function renderCurses(activeCurses) {
   });
 }
 
+function renderSettings(settings) {
+  // Не трогаем инпуты пока модалка открыта — пользователь может редактировать
+  if (settingsOpen) return;
+  const s = settings || {};
+  settingsInputs.overlayX.value = Number.isFinite(s.overlayX) ? s.overlayX : 20;
+  settingsInputs.overlayY.value = Number.isFinite(s.overlayY) ? s.overlayY : 20;
+  settingsInputs.overlayWidth.value = Number.isFinite(s.overlayWidth) ? s.overlayWidth : 620;
+  settingsInputs.overlayHeight.value = Number.isFinite(s.overlayHeight) ? s.overlayHeight : 260;
+}
+
 function renderState(state) {
   if (!state) return;
-
   renderTask(state.currentTask);
   renderCurses(state.activeCurses || []);
-
   stateElements.completed.textContent = String(state.completed ?? 0);
   stateElements.failed.textContent = String(state.failed ?? 0);
-
-  const settings = state.settings || {};
-  settingsInputs.overlayX.value = Number.isFinite(settings.overlayX) ? settings.overlayX : 20;
-  settingsInputs.overlayY.value = Number.isFinite(settings.overlayY) ? settings.overlayY : 20;
-  settingsInputs.overlayWidth.value = Number.isFinite(settings.overlayWidth) ? settings.overlayWidth : 620;
-  settingsInputs.overlayHeight.value = Number.isFinite(settings.overlayHeight) ? settings.overlayHeight : 260;
+  renderSettings(state.settings);
 }
 
 async function refreshState() {
@@ -95,8 +101,15 @@ async function refreshState() {
   renderState(state);
 }
 
-function openSettings() { modal.classList.add('open'); }
-function closeSettings() { modal.classList.remove('open'); }
+function openSettings() {
+  settingsOpen = true;
+  modal.classList.add('open');
+}
+
+function closeSettings() {
+  settingsOpen = false;
+  modal.classList.remove('open');
+}
 
 function getSettingsPayload() {
   return {
@@ -109,6 +122,7 @@ function getSettingsPayload() {
 
 async function saveSettings() {
   const state = await window.electronAPI.updateSettings(getSettingsPayload());
+  settingsOpen = false; // разрешаем рендер перед закрытием
   renderState(state);
   closeSettings();
 }
@@ -140,7 +154,6 @@ async function initialize() {
 
   buttons.settings.addEventListener('click', () => openSettings());
   buttons.closeSettings.addEventListener('click', () => closeSettings());
-
   buttons.saveSettings.addEventListener('click', async () => { await saveSettings(); });
   buttons.resetProgress.addEventListener('click', async () => { await resetProgress(); });
 
