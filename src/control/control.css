@@ -69,6 +69,8 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .card,
@@ -89,7 +91,21 @@ button.secondary {
   letter-spacing: 0.8px;
 }
 
-.value,
+.task-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffe58a;
+  word-break: break-word;
+}
+
+.task-desc {
+  font-size: 14px;
+  color: #c8d4e0;
+  margin-top: 6px;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
 .curse-list {
   font-size: 15px;
   line-height: 1.35;
@@ -98,11 +114,11 @@ button.secondary {
 
 .curse-item {
   display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
   padding: 10px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
 }
 
 .curse-item:last-child {
@@ -114,13 +130,24 @@ button.secondary {
   padding-top: 0;
 }
 
-.curse-text {
-  flex: 1;
+.curse-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffb0b0;
+  padding-right: 70px;
+}
+
+.curse-desc {
+  font-size: 13px;
+  color: #e0c8c8;
+  line-height: 1.35;
 }
 
 .curse-close {
-  flex: 0 0 auto;
-  padding: 8px 10px;
+  position: absolute;
+  top: 8px;
+  right: 0;
+  padding: 6px 10px;
   font-size: 12px;
 }
 
@@ -135,6 +162,7 @@ button.secondary {
   font-weight: 800;
 }
 
+/* Settings modal */
 .modal {
   position: fixed;
   inset: 0;
@@ -161,7 +189,7 @@ button.secondary {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 360px;
+  width: 380px;
   max-width: calc(100vw - 32px);
   transform: translate(-50%, -50%);
   background: #171b22;
@@ -174,14 +202,20 @@ button.secondary {
 
 .modal-content h2 {
   margin: 0 0 16px;
-  font-size: 22px;
+  font-size: 20px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 14px;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .field span {
@@ -190,19 +224,21 @@ button.secondary {
 }
 
 .field input {
-  height: 42px;
+  height: 40px;
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 12px;
   padding: 0 12px;
   background: #0f1319;
   color: #f5f7fb;
-  font-size: 15px;
+  font-size: 14px;
   outline: none;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .modal-actions {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 16px;
 }

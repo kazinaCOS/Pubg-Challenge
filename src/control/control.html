@@ -24,7 +24,8 @@
     <section class="info">
       <article class="card">
         <div class="label">Текущее задание</div>
-        <div id="current-task" class="value">Нет задания</div>
+        <div id="current-task-title" class="value task-title">Нет задания</div>
+        <div id="current-task-desc" class="task-desc"></div>
       </article>
 
       <article class="card">
@@ -48,17 +49,29 @@
   <div id="settings-modal" class="modal">
     <div class="modal-backdrop"></div>
     <div class="modal-content">
-      <h2>Настройки</h2>
+      <h2>Настройки оверлея</h2>
 
-      <label class="field">
-        <span>Позиция Overlay X</span>
-        <input id="overlay-x" type="number" step="1">
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>X</span>
+          <input id="overlay-x" type="number" step="1">
+        </label>
+        <label class="field">
+          <span>Y</span>
+          <input id="overlay-y" type="number" step="1">
+        </label>
+      </div>
 
-      <label class="field">
-        <span>Позиция Overlay Y</span>
-        <input id="overlay-y" type="number" step="1">
-      </label>
+      <div class="field-row">
+        <label class="field">
+          <span>Ширина (px)</span>
+          <input id="overlay-width" type="number" step="10" min="300">
+        </label>
+        <label class="field">
+          <span>Высота (px)</span>
+          <input id="overlay-height" type="number" step="10" min="120">
+        </label>
+      </div>
 
       <div class="modal-actions">
         <button id="btn-save-settings" class="primary">💾 Сохранить</button>

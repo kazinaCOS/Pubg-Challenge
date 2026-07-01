@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resetProgress: () => ipcRenderer.invoke('app:resetProgress'),
   openEditor: () => ipcRenderer.invoke('app:openEditor'),
   getLibrary: () => ipcRenderer.invoke('app:getLibrary'),
-  saveLibrary: (payload) => ipcRenderer.invoke('app:saveLibrary', payload)
+  saveLibrary: (payload) => ipcRenderer.invoke('app:saveLibrary', payload),
+  exportLibrary: () => ipcRenderer.invoke('app:exportLibrary'),
+  importLibrary: () => ipcRenderer.invoke('app:importLibrary')
 });

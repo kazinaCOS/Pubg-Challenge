@@ -1,5 +1,6 @@
 const elements = {
-  task: document.getElementById('overlay-task'),
+  taskTitle: document.getElementById('overlay-task-title'),
+  taskDesc: document.getElementById('overlay-task-desc'),
   curses: document.getElementById('overlay-curses'),
   cursesEmpty: document.getElementById('overlay-curses-empty'),
   completed: document.getElementById('overlay-completed'),
@@ -8,24 +9,23 @@ const elements = {
 
 let lastSerializedState = '';
 
-function valueText(value, fallback) {
-  if (!value) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value.text || fallback;
-  }
-
-  return String(value);
-}
-
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+function getTaskTitle(task) {
+  if (!task) return 'Нет задания';
+  if (typeof task === 'object') return task.title || task.text || 'Нет задания';
+  return String(task);
+}
+
+function getTaskDesc(task) {
+  if (!task || typeof task !== 'object') return '';
+  return task.description || '';
 }
 
 function renderCurses(activeCurses) {
@@ -36,21 +36,34 @@ function renderCurses(activeCurses) {
   }
 
   elements.cursesEmpty.style.display = 'none';
-  elements.curses.innerHTML = activeCurses.map((curse) => `
-    <div class="curse-pill">${escapeHtml(curse.text)}</div>
-  `).join('');
+  elements.curses.innerHTML = activeCurses.map(curse => {
+    const title = curse.title || curse.text || '';
+    const desc = curse.description || '';
+    return `
+      <div class="curse-pill">
+        <span class="curse-pill-title">${escapeHtml(title)}</span>
+        ${desc ? `<span class="curse-pill-desc">${escapeHtml(desc)}</span>` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 function renderState(state) {
-  elements.task.textContent = valueText(state.currentTask, 'Нет задания');
+  const title = getTaskTitle(state.currentTask);
+  const desc = getTaskDesc(state.currentTask);
+
+  elements.taskTitle.textContent = title;
+  elements.taskDesc.textContent = desc;
+  elements.taskDesc.style.display = desc ? 'block' : 'none';
+
   elements.completed.textContent = String(state.completed ?? 0);
   elements.failed.textContent = String(state.failed ?? 0);
   renderCurses(state.activeCurses || []);
 }
 
 function renderError(message) {
-  elements.task.textContent = 'Ошибка overlay';
-  elements.cursesEmpty.textContent = message;
+  elements.taskTitle.textContent = 'Ошибка overlay';
+  elements.taskDesc.textContent = message;
   elements.completed.textContent = '!';
   elements.failed.textContent = '!';
 }
@@ -79,7 +92,6 @@ async function updateFromMain() {
     }
 
     const serialized = serializeState(state);
-
     if (serialized !== lastSerializedState) {
       lastSerializedState = serialized;
       renderState(state);
