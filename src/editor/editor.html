@@ -9,34 +9,83 @@
 <body>
   <main class="editor">
     <header class="topbar">
-      <h1>Редактор заданий и наказаний</h1>
+      <h1>Редактор</h1>
       <div class="topbar-actions">
-        <label class="generator-toggle-label">
-          <input type="checkbox" id="generator-toggle">
-          <span>Генератор</span>
-        </label>
         <button id="btn-import" class="secondary">📂 Импорт</button>
         <button id="btn-export" class="secondary">💾 Экспорт</button>
         <button id="btn-save-all" class="primary">✔ Сохранить всё</button>
       </div>
     </header>
 
-    <section class="grid">
-      <article class="panel">
-        <div class="panel-head">
-          <h2>Задания</h2>
-          <button id="btn-add-task">+ Добавить</button>
-        </div>
-        <div id="tasks-list" class="list"></div>
-      </article>
+    <!-- Вкладки -->
+    <nav class="tabs">
+      <button class="tab active" data-tab="tasks">🎯 Задания</button>
+      <button class="tab" data-tab="curses">⚠ Наказания</button>
+      <button class="tab" data-tab="generator">🎲 Генератор</button>
+    </nav>
 
-      <article class="panel">
-        <div class="panel-head">
-          <h2>Наказания</h2>
-          <button id="btn-add-curse">+ Добавить</button>
+    <!-- Задания -->
+    <section class="tab-content active" id="tab-tasks">
+      <div class="panel-head">
+        <span class="hint">Название + описание + теги через запятую</span>
+        <button id="btn-add-task">+ Добавить</button>
+      </div>
+      <div id="tasks-list" class="list"></div>
+    </section>
+
+    <!-- Наказания -->
+    <section class="tab-content" id="tab-curses">
+      <div class="panel-head">
+        <span class="hint">Название + описание + теги через запятую</span>
+        <button id="btn-add-curse">+ Добавить</button>
+      </div>
+      <div id="curses-list" class="list"></div>
+    </section>
+
+    <!-- Генератор -->
+    <section class="tab-content" id="tab-generator">
+      <div class="generator-layout">
+
+        <!-- Левая колонка: шаблоны -->
+        <div class="gen-col">
+          <div class="panel-head">
+            <div>
+              <h2>Шаблоны</h2>
+              <p class="hint">Используй <code>{имя_пула}</code> в названии или описании.<br>Пример: <code>Убить {количество} игроков с {оружие}</code></p>
+            </div>
+            <button id="btn-add-template">+ Добавить</button>
+          </div>
+          <div id="templates-list" class="list"></div>
         </div>
-        <div id="curses-list" class="list"></div>
-      </article>
+
+        <!-- Правая колонка: пулы -->
+        <div class="gen-col">
+          <div class="panel-head">
+            <div>
+              <h2>Пулы значений</h2>
+              <p class="hint">Каждый пул — это набор слов/фраз для подстановки в шаблоны.</p>
+            </div>
+            <button id="btn-add-pool">+ Добавить пул</button>
+          </div>
+          <div id="pools-list" class="pools-list"></div>
+
+          <div class="generator-toggle-row">
+            <label class="generator-toggle-label">
+              <input type="checkbox" id="generator-toggle">
+              <span>Включить генератор (50/50 с рукописными)</span>
+            </label>
+          </div>
+
+          <div class="preview-block">
+            <div class="panel-head" style="margin-bottom:8px">
+              <h3 style="margin:0">Превью</h3>
+              <button id="btn-preview" class="secondary">🎲 Сгенерировать</button>
+            </div>
+            <div id="preview-output" class="preview-output">Нажми кнопку — увидишь пример задания из текущих шаблонов и пулов.</div>
+          </div>
+        </div>
+
+      </div>
     </section>
   </main>
 

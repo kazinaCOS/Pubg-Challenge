@@ -1,17 +1,4 @@
 const fs = require('fs');
-const path = require('path');
-
-// Встроенные задания от генератора (расширяемо)
-const GENERATED_TASKS = [
-  { title: 'Снайпер поневоле', description: 'Использовать только снайперские винтовки', tags: ['оружие'] },
-  { title: 'Рукопашный', description: 'Первое убийство сделать только кулаком или сковородкой', tags: ['оружие'] },
-  { title: 'Без аптечек', description: 'Не использовать бинты и аптечки, только энергетики', tags: ['лечение'] },
-  { title: 'Одиночный выстрел', description: 'Стрелять только в одиночном режиме огня', tags: ['оружие'] },
-  { title: 'Пешком везде', description: 'Не использовать транспорт всю игру', tags: ['транспорт'] },
-  { title: 'Лутер', description: 'Посетить не менее 5 зданий в одном городе', tags: ['локация', 'здания'] },
-  { title: 'Меткий стрелок', description: 'Все выстрелы только стоя — никакого присяда при стрельбе', tags: ['оружие'] },
-  { title: 'Скромник', description: 'Не брать бронежилет выше первого уровня', tags: ['снаряжение'] },
-];
 
 class TaskManager {
   constructor(tasksPath) {
@@ -24,23 +11,51 @@ class TaskManager {
     return {
       tasks: [],
       curses: [],
-      generatorEnabled: false
+      generatorEnabled: false,
+      pools: {},
+      templates: []
     };
   }
 
   normalizeItem(item) {
     if (!item || typeof item !== 'object') return null;
+    const id = Number.isFinite(item.id) ? item.id : null;
+    if (!Number.isFinite(id)) return null;
     const title = typeof item.title === 'string' ? item.title.trim() : '';
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
-    const id = Number.isFinite(item.id) ? item.id : null;
-    if (!Number.isFinite(id)) return null;
     if (!title && !description) return null;
     return { id, title, description, tags };
   }
 
+  normalizeTemplate(item) {
+    if (!item || typeof item !== 'object') return null;
+    const id = Number.isFinite(item.id) ? item.id : null;
+    if (!Number.isFinite(id)) return null;
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    const description = typeof item.description === 'string' ? item.description.trim() : '';
+    const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
+    if (!title && !description) return null;
+    return { id, title, description, tags };
+  }
+
+  normalizePools(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    const result = {};
+    for (const [key, val] of Object.entries(input)) {
+      if (typeof key === 'string' && Array.isArray(val)) {
+        result[key] = val.filter(v => typeof v === 'string' && v.trim()).map(v => v.trim());
+      }
+    }
+    return result;
+  }
+
   normalizeItems(items = []) {
     return items.map(item => this.normalizeItem(item)).filter(Boolean);
+  }
+
+  normalizeTemplates(items = []) {
+    return items.map(item => this.normalizeTemplate(item)).filter(Boolean);
   }
 
   normalizeLibrary(input) {
@@ -48,20 +63,24 @@ class TaskManager {
     return {
       tasks: this.normalizeItems(data.tasks),
       curses: this.normalizeItems(data.curses),
-      generatorEnabled: data.generatorEnabled === true
+      generatorEnabled: data.generatorEnabled === true,
+      pools: this.normalizePools(data.pools),
+      templates: this.normalizeTemplates(data.templates)
     };
   }
 
   ensureFile() {
+    const fs2 = require('fs');
+    const path = require('path');
     const dir = path.dirname(this.tasksPath);
-    fs.mkdirSync(dir, { recursive: true });
-    if (!fs.existsSync(this.tasksPath)) {
-      fs.writeFileSync(this.tasksPath, JSON.stringify(this.getDefaultLibrary(), null, 2), 'utf8');
+    fs2.mkdirSync(dir, { recursive: true });
+    if (!fs2.existsSync(this.tasksPath)) {
+      fs2.writeFileSync(this.tasksPath, JSON.stringify(this.getDefaultLibrary(), null, 2), 'utf8');
       return;
     }
-    const content = fs.readFileSync(this.tasksPath, 'utf8');
+    const content = fs2.readFileSync(this.tasksPath, 'utf8');
     if (!content.trim()) {
-      fs.writeFileSync(this.tasksPath, JSON.stringify(this.getDefaultLibrary(), null, 2), 'utf8');
+      fs2.writeFileSync(this.tasksPath, JSON.stringify(this.getDefaultLibrary(), null, 2), 'utf8');
     }
   }
 
@@ -77,7 +96,9 @@ class TaskManager {
     return {
       tasks: this.library.tasks.map(item => ({ ...item })),
       curses: this.library.curses.map(item => ({ ...item })),
-      generatorEnabled: this.library.generatorEnabled
+      generatorEnabled: this.library.generatorEnabled,
+      pools: JSON.parse(JSON.stringify(this.library.pools)),
+      templates: this.library.templates.map(item => ({ ...item }))
     };
   }
 
@@ -95,61 +116,73 @@ class TaskManager {
     return this.library.curses.find(item => item.id === id) || null;
   }
 
-  // Проверяет конфликт: есть ли у задания теги, совпадающие с тегами активных наказаний
+  // Подставляет случайные значения из пулов в шаблон вида "Убить {количество} с {оружие}"
+  fillTemplate(template) {
+    const pools = this.library.pools;
+
+    const fill = (str) => str.replace(/\{([^}]+)\}/g, (match, key) => {
+      const pool = pools[key];
+      if (!pool || !pool.length) return match; // оставляем как есть если пул не найден
+      return pool[Math.floor(Math.random() * pool.length)];
+    });
+
+    return {
+      id: -1,
+      title: fill(template.title),
+      description: fill(template.description),
+      tags: template.tags.slice(),
+      generated: true,
+      templateId: template.id
+    };
+  }
+
+  // Конфликт: есть ли пересечение тегов задания с тегами активных наказаний
   hasConflict(task, activeCurses) {
     if (!task || !Array.isArray(task.tags) || !task.tags.length) return false;
     for (const curse of activeCurses) {
       if (!Array.isArray(curse.tags)) continue;
-      const overlap = task.tags.some(t => curse.tags.includes(t));
-      if (overlap) return true;
+      if (task.tags.some(t => curse.tags.includes(t))) return true;
     }
     return false;
   }
 
-  // Генерирует задание (из встроенного пула), не конфликтующее с активными наказаниями
-  // Возвращает объект с флагом generated:true, id отрицательный (не хранится в библиотеке)
+  // Генерирует задание из пула шаблонов, избегая конфликтов с наказаниями
   getGeneratedTask(activeCurses = []) {
-    const available = GENERATED_TASKS.filter(t => !this.hasConflict(t, activeCurses));
-    const pool = available.length ? available : GENERATED_TASKS;
-    const idx = Math.floor(Math.random() * pool.length);
-    const t = pool[idx];
-    return {
-      id: -1,
-      title: t.title,
-      description: t.description,
-      tags: t.tags,
-      generated: true
-    };
+    const templates = this.library.templates;
+    if (!templates.length) return null;
+
+    // Пробуем найти шаблон без конфликта
+    let available = templates.filter(t => !this.hasConflict(t, activeCurses));
+    if (!available.length) available = templates; // если все конфликтуют — берём любой
+
+    const template = available[Math.floor(Math.random() * available.length)];
+    return this.fillTemplate(template);
   }
 
   getRandomTask(recentTaskIds = [], activeCurses = []) {
-    // Фильтруем по недавним И по конфликтам с наказаниями
-    let available = this.library.tasks.filter(
-      task => !recentTaskIds.includes(task.id) && !this.hasConflict(task, activeCurses)
-    );
-    // Если все отфильтрованы по конфликту — игнорируем конфликт, берём хотя бы не-недавние
-    if (!available.length) {
-      available = this.library.tasks.filter(task => !recentTaskIds.includes(task.id));
-    }
-    // Если все недавние — берём весь пул (без конфликта)
-    if (!available.length) {
-      available = this.library.tasks.filter(task => !this.hasConflict(task, activeCurses));
-    }
+    let pool = this.library.tasks;
+
+    // Убираем недавние И конфликтные
+    let available = pool.filter(t => !recentTaskIds.includes(t.id) && !this.hasConflict(t, activeCurses));
+
+    // Если всё отфильтровано по конфликту — игнорируем конфликт, берём не-недавние
+    if (!available.length) available = pool.filter(t => !recentTaskIds.includes(t.id));
+
+    // Если все недавние — убираем хотя бы конфликтные
+    if (!available.length) available = pool.filter(t => !this.hasConflict(t, activeCurses));
+
     // Крайний случай — весь пул
-    if (!available.length) {
-      available = this.library.tasks;
-    }
+    if (!available.length) available = pool;
+
     if (!available.length) return null;
-    const idx = Math.floor(Math.random() * available.length);
-    return available[idx];
+    return available[Math.floor(Math.random() * available.length)];
   }
 
   getRandomCurse(activeCurseIds = []) {
-    const available = this.library.curses.filter(curse => !activeCurseIds.includes(curse.id));
+    const available = this.library.curses.filter(c => !activeCurseIds.includes(c.id));
     const pool = available.length ? available : this.library.curses;
     if (!pool.length) return null;
-    const idx = Math.floor(Math.random() * pool.length);
-    return pool[idx];
+    return pool[Math.floor(Math.random() * pool.length)];
   }
 }
 
