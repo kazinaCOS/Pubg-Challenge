@@ -10,7 +10,15 @@
   <main class="editor">
     <header class="topbar">
       <h1>Редактор заданий и наказаний</h1>
-      <button id="btn-save-all" class="primary">💾 Сохранить всё</button>
+      <div class="topbar-actions">
+        <label class="generator-toggle-label">
+          <input type="checkbox" id="generator-toggle">
+          <span>Генератор</span>
+        </label>
+        <button id="btn-import" class="secondary">📂 Импорт</button>
+        <button id="btn-export" class="secondary">💾 Экспорт</button>
+        <button id="btn-save-all" class="primary">✔ Сохранить всё</button>
+      </div>
     </header>
 
     <section class="grid">

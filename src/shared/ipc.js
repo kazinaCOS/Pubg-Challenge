@@ -9,10 +9,12 @@ function registerIpcHandlers(ipcMain, handlers) {
     'app:resetProgress',
     'app:openEditor',
     'app:getLibrary',
-    'app:saveLibrary'
+    'app:saveLibrary',
+    'app:exportLibrary',
+    'app:importLibrary'
   ];
 
-  channels.forEach((channel) => {
+  channels.forEach(channel => {
     ipcMain.removeHandler(channel);
   });
 
@@ -26,8 +28,8 @@ function registerIpcHandlers(ipcMain, handlers) {
   ipcMain.handle('app:openEditor', async () => handlers.openEditor());
   ipcMain.handle('app:getLibrary', async () => handlers.getLibrary());
   ipcMain.handle('app:saveLibrary', async (_event, payload) => handlers.saveLibrary(payload));
+  ipcMain.handle('app:exportLibrary', async () => handlers.exportLibrary());
+  ipcMain.handle('app:importLibrary', async () => handlers.importLibrary());
 }
 
-module.exports = {
-  registerIpcHandlers
-};
+module.exports = { registerIpcHandlers };

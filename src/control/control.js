@@ -1,5 +1,6 @@
 const stateElements = {
-  currentTask: document.getElementById('current-task'),
+  currentTaskTitle: document.getElementById('current-task-title'),
+  currentTaskDesc: document.getElementById('current-task-desc'),
   activeCurses: document.getElementById('active-curses'),
   completed: document.getElementById('completed'),
   failed: document.getElementById('failed')
@@ -21,42 +22,10 @@ const modalBackdrop = document.querySelector('.modal-backdrop');
 
 const settingsInputs = {
   overlayX: document.getElementById('overlay-x'),
-  overlayY: document.getElementById('overlay-y')
+  overlayY: document.getElementById('overlay-y'),
+  overlayWidth: document.getElementById('overlay-width'),
+  overlayHeight: document.getElementById('overlay-height')
 };
-
-function textOrFallback(value, fallback) {
-  if (!value) {
-    return fallback;
-  }
-
-  if (typeof value === 'object') {
-    return value.text || fallback;
-  }
-
-  return String(value);
-}
-
-function renderCurses(activeCurses) {
-  if (!Array.isArray(activeCurses) || !activeCurses.length) {
-    stateElements.activeCurses.textContent = 'Нет активных наказаний';
-    return;
-  }
-
-  stateElements.activeCurses.innerHTML = activeCurses.map((curse) => `
-    <div class="curse-item">
-      <div class="curse-text">${escapeHtml(curse.text)}</div>
-      <button class="curse-close danger" data-curse-id="${curse.id}">Закрыть</button>
-    </div>
-  `).join('');
-
-  Array.from(stateElements.activeCurses.querySelectorAll('[data-curse-id]')).forEach((button) => {
-    button.addEventListener('click', async () => {
-      const curseId = Number(button.getAttribute('data-curse-id'));
-      const state = await window.electronAPI.clearCurse(curseId);
-      renderState(state);
-    });
-  });
-}
 
 function escapeHtml(value) {
   return String(value)
@@ -66,19 +35,59 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-function renderState(state) {
-  if (!state) {
+function renderTask(task) {
+  if (!task) {
+    stateElements.currentTaskTitle.textContent = 'Нет задания';
+    stateElements.currentTaskDesc.textContent = '';
+    return;
+  }
+  const title = typeof task === 'object' ? (task.title || task.text || '') : String(task);
+  const desc = typeof task === 'object' ? (task.description || '') : '';
+  stateElements.currentTaskTitle.textContent = title || 'Нет задания';
+  stateElements.currentTaskDesc.textContent = desc;
+}
+
+function renderCurses(activeCurses) {
+  if (!Array.isArray(activeCurses) || !activeCurses.length) {
+    stateElements.activeCurses.textContent = 'Нет активных наказаний';
     return;
   }
 
-  stateElements.currentTask.textContent = textOrFallback(state.currentTask, 'Нет задания');
+  stateElements.activeCurses.innerHTML = activeCurses.map(curse => {
+    const title = curse.title || curse.text || '';
+    const desc = curse.description || '';
+    return `
+      <div class="curse-item">
+        <div class="curse-title">${escapeHtml(title)}</div>
+        ${desc ? `<div class="curse-desc">${escapeHtml(desc)}</div>` : ''}
+        <button class="curse-close danger" data-curse-id="${curse.id}">Закрыть</button>
+      </div>
+    `;
+  }).join('');
+
+  Array.from(stateElements.activeCurses.querySelectorAll('[data-curse-id]')).forEach(button => {
+    button.addEventListener('click', async () => {
+      const curseId = Number(button.getAttribute('data-curse-id'));
+      const state = await window.electronAPI.clearCurse(curseId);
+      renderState(state);
+    });
+  });
+}
+
+function renderState(state) {
+  if (!state) return;
+
+  renderTask(state.currentTask);
+  renderCurses(state.activeCurses || []);
+
   stateElements.completed.textContent = String(state.completed ?? 0);
   stateElements.failed.textContent = String(state.failed ?? 0);
-  renderCurses(state.activeCurses || []);
 
   const settings = state.settings || {};
   settingsInputs.overlayX.value = Number.isFinite(settings.overlayX) ? settings.overlayX : 20;
   settingsInputs.overlayY.value = Number.isFinite(settings.overlayY) ? settings.overlayY : 20;
+  settingsInputs.overlayWidth.value = Number.isFinite(settings.overlayWidth) ? settings.overlayWidth : 620;
+  settingsInputs.overlayHeight.value = Number.isFinite(settings.overlayHeight) ? settings.overlayHeight : 260;
 }
 
 async function refreshState() {
@@ -86,18 +95,15 @@ async function refreshState() {
   renderState(state);
 }
 
-function openSettings() {
-  modal.classList.add('open');
-}
-
-function closeSettings() {
-  modal.classList.remove('open');
-}
+function openSettings() { modal.classList.add('open'); }
+function closeSettings() { modal.classList.remove('open'); }
 
 function getSettingsPayload() {
   return {
     overlayX: Number(settingsInputs.overlayX.value),
-    overlayY: Number(settingsInputs.overlayY.value)
+    overlayY: Number(settingsInputs.overlayY.value),
+    overlayWidth: Number(settingsInputs.overlayWidth.value),
+    overlayHeight: Number(settingsInputs.overlayHeight.value)
   };
 }
 
@@ -109,9 +115,7 @@ async function saveSettings() {
 
 async function resetProgress() {
   const result = await window.electronAPI.resetProgress();
-  if (result && result.state) {
-    renderState(result.state);
-  }
+  if (result && result.state) renderState(result.state);
 }
 
 async function initialize() {
@@ -134,32 +138,18 @@ async function initialize() {
     await window.electronAPI.openEditor();
   });
 
-  buttons.settings.addEventListener('click', () => {
-    openSettings();
-  });
+  buttons.settings.addEventListener('click', () => openSettings());
+  buttons.closeSettings.addEventListener('click', () => closeSettings());
 
-  buttons.closeSettings.addEventListener('click', () => {
-    closeSettings();
-  });
-
-  buttons.saveSettings.addEventListener('click', async () => {
-    await saveSettings();
-  });
-
-  buttons.resetProgress.addEventListener('click', async () => {
-    await resetProgress();
-  });
+  buttons.saveSettings.addEventListener('click', async () => { await saveSettings(); });
+  buttons.resetProgress.addEventListener('click', async () => { await resetProgress(); });
 
   if (modalBackdrop) {
-    modalBackdrop.addEventListener('click', () => {
-      closeSettings();
-    });
+    modalBackdrop.addEventListener('click', () => closeSettings());
   }
 
-  window.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') {
-      closeSettings();
-    }
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeSettings();
   });
 
   await refreshState();
