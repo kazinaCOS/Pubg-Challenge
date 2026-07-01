@@ -85,6 +85,26 @@ function migrateTasksFile(targetPath, bundledPath) {
       if (!Array.isArray(data.curses) || data.curses.length === 0) {
         data.curses = bundled.curses || [];
         changed = true;
+      } else {
+        // Мигрируем difficulty для наказаний (если нет — ставим easy)
+        let curseChanged = false;
+        data.curses = data.curses.map(c => {
+          if (!c.difficulty) { curseChanged = true; return { ...c, difficulty: 'easy' }; }
+          return c;
+        });
+        if (curseChanged) changed = true;
+      }
+      // curseTemplates difficulty migration
+      if (!Array.isArray(data.curseTemplates) || data.curseTemplates.length === 0) {
+        data.curseTemplates = bundled.curseTemplates || [];
+        changed = true;
+      } else {
+        let ctChanged = false;
+        data.curseTemplates = data.curseTemplates.map(c => {
+          if (!c.difficulty) { ctChanged = true; return { ...c, difficulty: 'easy' }; }
+          return c;
+        });
+        if (ctChanged) changed = true;
       }
       // pools: поле отсутствует → берём из bundled
       if (!data.pools || Object.keys(data.pools).length === 0) {
@@ -96,11 +116,23 @@ function migrateTasksFile(targetPath, bundledPath) {
         data.templates = bundled.templates || [];
         changed = true;
       }
-      // curseTemplates: поле отсутствует → берём из bundled
-      if (!Array.isArray(data.curseTemplates) || data.curseTemplates.length === 0) {
-        data.curseTemplates = bundled.curseTemplates || [];
+      // difficultyWeights: поле отсутствует → дефолты
+      if (!data.difficultyWeights) {
+        data.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
         changed = true;
       }
+      if (!data.curseDifficultyWeights) {
+        data.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+        changed = true;
+      }
+      // Убираем weight с элементов (устаревшее поле)
+      ['tasks', 'curses', 'templates', 'curseTemplates'].forEach(key => {
+        if (Array.isArray(data[key])) {
+          const before = JSON.stringify(data[key]);
+          data[key] = data[key].map(({ weight: _, ...rest }) => rest);
+          if (JSON.stringify(data[key]) !== before) changed = true;
+        }
+      });
     } else {
       if (!data.pools) { data.pools = {}; changed = true; }
       if (!data.templates) { data.templates = []; changed = true; }
@@ -274,34 +306,36 @@ function makeUid() {
 }
 
 // Выбирает одно задание заданной сложности (50/50 генератор/рукописное если включён)
+// difficulty = null => выбирается по difficultyWeights, иначе принудительно
 function pickOneTask(difficulty, activeCurses, excludeIds = []) {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
+  // Если difficulty не задан — берём по весам сложностей
+  const diff = difficulty || taskManager.pickTaskDifficulty();
 
   if (genEnabled) {
-    const hasWritten = taskManager.library.tasks.filter(t => t.difficulty === difficulty).length > 0;
-    const hasTemplates = taskManager.library.templates.filter(t => t.difficulty === difficulty).length > 0;
+    const hasWritten = taskManager.library.tasks.filter(t => t.difficulty === diff).length > 0;
+    const hasTemplates = taskManager.library.templates.filter(t => t.difficulty === diff).length > 0;
 
     if (!hasWritten && hasTemplates) {
-      const gen = taskManager.getGeneratedTask(activeCurses, difficulty);
+      const gen = taskManager.getGeneratedTask(activeCurses, diff);
       if (gen) return { ...gen, uid: makeUid() };
     } else if (hasWritten || hasTemplates) {
       const useGen = Math.random() < 0.5;
       if (useGen && hasTemplates) {
-        const gen = taskManager.getGeneratedTask(activeCurses, difficulty);
+        const gen = taskManager.getGeneratedTask(activeCurses, diff);
         if (gen) return { ...gen, uid: makeUid() };
       }
     }
   }
 
-  // Рукописное — excludeIds = история последних 2 раундов + уже выбранные в этом раунде
   const recentIds = stateManager.getPublicState().recentTaskIds;
-  const task = taskManager.getRandomTask(recentIds, activeCurses, difficulty, excludeIds);
+  const task = taskManager.getRandomTask(recentIds, activeCurses, diff, excludeIds);
   if (task) {
     stateManager.addRecentTask(task.id);
     return { ...task, uid: makeUid() };
   }
 
-  // Fallback: без фильтра по difficulty
+  // Fallback: без фильтра по diff
   const taskAny = taskManager.getRandomTask(recentIds, activeCurses, null, excludeIds);
   if (taskAny) {
     stateManager.addRecentTask(taskAny.id);
@@ -329,12 +363,11 @@ function buildRound() {
     }
   };
 
-  tryPick('easy');
+  tryPick('easy'); // первое задание всегда лёгкое
 
-  const difficulties = ['easy', 'medium', 'heavy'];
+  // два следующих — сложность по difficultyWeights
   for (let i = 0; i < 2; i++) {
-    const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
-    tryPick(diff);
+    tryPick(null); // null => выбор по весам внутри pickOneTask
   }
 
   // Сохраняем текущий раунд в историю
@@ -343,13 +376,15 @@ function buildRound() {
   return tasks;
 }
 
-// Выбирает следующее наказание (без дублей активных)
+// Выбирает следующее наказание (сложность по curseDifficultyWeights, без дублей)
 function pickNextCurse() {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
   const activeCurseIds = stateManager.getActiveCurseIds();
+  // Сложность наказания выбирается по весам
+  const diff = taskManager.pickCurseDifficulty();
 
   if (genEnabled && taskManager.library.curses.length === 0) {
-    const gen = taskManager.getGeneratedCurse();
+    const gen = taskManager.getGeneratedCurse(diff);
     if (gen) stateManager.addGeneratedCurse(gen);
     return;
   }
@@ -357,14 +392,13 @@ function pickNextCurse() {
   if (genEnabled) {
     const useGen = Math.random() < 0.5;
     if (useGen) {
-      const gen = taskManager.getGeneratedCurse();
+      const gen = taskManager.getGeneratedCurse(diff);
       if (gen) stateManager.addGeneratedCurse(gen);
       return;
     }
   }
 
-  // excludeIds = уже активные наказания (дедупликация)
-  const curse = taskManager.getRandomCurse(activeCurseIds, activeCurseIds);
+  const curse = taskManager.getRandomCurse(activeCurseIds, activeCurseIds, diff);
   if (curse) stateManager.addActiveCurse(curse.id);
 }
 

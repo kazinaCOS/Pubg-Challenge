@@ -514,3 +514,53 @@ button.danger { background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%); c
   border-color: #4a8fff;
   background: rgba(74, 143, 255, 0.1);
 }
+
+/* Difficulty Weights block */
+.dw-block {
+  margin-top: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+}
+
+.dw-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #d0dae8;
+}
+
+.dw-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dw-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.diff-easy-text { color: #4ef0a7; }
+.diff-medium-text { color: #ffd54a; }
+.diff-heavy-text { color: #ff9090; }
+
+.dw-input {
+  width: 52px;
+  padding: 4px 6px;
+  font-size: 13px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.dw-input:focus {
+  outline: none;
+  border-color: #4a8fff;
+  background: rgba(74,143,255,0.1);
+}

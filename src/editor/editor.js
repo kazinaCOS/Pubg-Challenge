@@ -1,11 +1,11 @@
 'use strict';
 
 // ─── Состояние ───────────────────────────────────────────────────────────────
-let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [] };
+let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [], difficultyWeights: { easy: 3, medium: 2, heavy: 1 }, curseDifficultyWeights: { easy: 3, medium: 2, heavy: 1 } };
 
 const filters = {
   tasks:  { search: '', diff: '', tag: '' },
-  curses: { search: '', tag: '' },
+  curses: { search: '', diff: '', tag: '' },
   tmpls:  { search: '', diff: '', tag: '' }
 };
 
@@ -83,11 +83,7 @@ function renderTaskList(container, items, allItems) {
         <input class="item-tags" type="text" data-field="tags" data-type="task" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
-        <label class="item-weight-row">
-          <span class="item-weight-label">Вес</span>
-          <input class="item-weight" type="number" min="1" max="100" data-field="weight" data-type="task" data-id="${item.id}"
-            value="${item.weight != null ? item.weight : 1}">
-        </label>
+
       </div>
       <button class="danger btn-delete" data-delete-type="task" data-delete-id="${item.id}">✕</button>
     </div>
@@ -105,7 +101,7 @@ function renderTaskList(container, items, allItems) {
 // ─── Рендер: наказания ───────────────────────────────────────────────────────
 function renderCurseList(container, items, allItems) {
   if (!items.length) {
-    container.innerHTML = (filters.curses.search || filters.curses.tag)
+    container.innerHTML = (filters.curses.search || filters.curses.diff || filters.curses.tag)
       ? `<div class="empty-hint">Нет наказаний по фильтру.</div>`
       : `<div class="empty-hint">Нет записей. Нажми «+ Добавить».</div>`;
     return;
@@ -113,18 +109,20 @@ function renderCurseList(container, items, allItems) {
   container.innerHTML = items.map(item => `
     <div class="item" data-id="${item.id}" data-type="curse">
       <div class="item-fields">
-        <input class="item-title" type="text" data-field="title" data-type="curse" data-id="${item.id}"
-          placeholder="Название" value="${esc(item.title || '')}">
+        <div class="item-top-row">
+          <input class="item-title" type="text" data-field="title" data-type="curse" data-id="${item.id}"
+            placeholder="Название" value="${esc(item.title || '')}">
+          <select class="item-diff" data-field="difficulty" data-type="curse" data-id="${item.id}">
+            <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
+            <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
+            <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
+          </select>
+        </div>
         <textarea class="item-desc" data-field="description" data-type="curse" data-id="${item.id}"
           placeholder="Описание" rows="2">${esc(item.description || '')}</textarea>
         <input class="item-tags" type="text" data-field="tags" data-type="curse" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
-        <label class="item-weight-row">
-          <span class="item-weight-label">Вес</span>
-          <input class="item-weight" type="number" min="1" max="100" data-field="weight" data-type="curse" data-id="${item.id}"
-            value="${item.weight != null ? item.weight : 1}">
-        </label>
       </div>
       <button class="danger btn-delete" data-delete-type="curse" data-delete-id="${item.id}">✕</button>
     </div>
@@ -149,10 +147,8 @@ function collectTaskList(container) {
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     const diffEl = row.querySelector(`select[data-field="difficulty"]`);
     const difficulty = diffEl ? diffEl.value : 'easy';
-    const weightEl = row.querySelector(`input[data-field="weight"]`);
-    const weight = weightEl ? Math.max(1, Number(weightEl.value) || 1) : 1;
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags, difficulty, weight });
+    result.push({ id, title, description: desc, tags, difficulty });
   });
   return result;
 }
@@ -165,10 +161,10 @@ function collectCurseList(container) {
     const desc  = row.querySelector(`textarea[data-field="description"]`).value.trim();
     const tagsRaw = row.querySelector(`input[data-field="tags"]`).value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const weightEl = row.querySelector(`input[data-field="weight"]`);
-    const weight = weightEl ? Math.max(1, Number(weightEl.value) || 1) : 1;
+    const diffEl = row.querySelector(`select[data-field="difficulty"]`);
+    const difficulty = diffEl ? diffEl.value : 'easy';
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags, weight });
+    result.push({ id, title, description: desc, tags, difficulty });
   });
   return result;
 }
@@ -225,7 +221,7 @@ function renderCurseTemplates() {
   renderTemplateList(curseTemplatesList, library.curseTemplates || [], 'ctmpl', id => {
     library.curseTemplates = (library.curseTemplates || []).filter(t => t.id !== id);
     renderCurseTemplates();
-  }, false);
+  }, true);
 }
 
 function collectTemplateList(container, dataAttr, hasDiff = false) {
@@ -237,11 +233,9 @@ function collectTemplateList(container, dataAttr, hasDiff = false) {
     const tagsRaw = row.querySelector(`input[data-${dataAttr}-field="tags"]`).value.trim();
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     if (!title && !desc) return;
-    const entry = { id, title, description: desc, tags };
-    if (hasDiff) {
-      const diffEl = row.querySelector(`select[data-${dataAttr}-field="difficulty"]`);
-      entry.difficulty = diffEl ? diffEl.value : 'easy';
-    }
+    const diffEl = row.querySelector(`select[data-${dataAttr}-field="difficulty"]`);
+    const difficulty = diffEl ? diffEl.value : 'easy';
+    const entry = { id, title, description: desc, tags, difficulty };
     result.push(entry);
   });
   return result;
@@ -320,6 +314,28 @@ function collectPools() {
   return result;
 }
 
+// ─── Шансы сложностей ────────────────────────────────────────────────────────
+function collectDifficultyWeights(type) {
+  const prefix = type === 'task' ? 'dw' : 'cdw';
+  const result = {};
+  for (const d of ['easy', 'medium', 'heavy']) {
+    const el = document.getElementById(`${prefix}-${d}`);
+    result[d] = el ? Math.max(0, Number(el.value) || 0) : (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+  }
+  return result;
+}
+
+function renderDifficultyWeights() {
+  const dw = library.difficultyWeights || { easy: 3, medium: 2, heavy: 1 };
+  const cdw = library.curseDifficultyWeights || { easy: 3, medium: 2, heavy: 1 };
+  for (const d of ['easy', 'medium', 'heavy']) {
+    const el = document.getElementById(`dw-${d}`);
+    if (el) el.value = dw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+    const cel = document.getElementById(`cdw-${d}`);
+    if (cel) cel.value = cdw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+  }
+}
+
 // ─── Полный рендер ────────────────────────────────────────────────────────────
 function render() {
   renderTaskListFiltered();
@@ -327,6 +343,7 @@ function render() {
   renderTemplatesFiltered();
   renderCurseTemplates();
   renderPools();
+  renderDifficultyWeights();
   if (generatorToggle) generatorToggle.checked = library.generatorEnabled === true;
 }
 
@@ -357,7 +374,9 @@ function collectAll() {
     generatorEnabled: generatorToggle ? generatorToggle.checked : library.generatorEnabled,
     pools,
     templates: fixedTemplates,
-    curseTemplates: fixedCurseTmpls
+    curseTemplates: fixedCurseTmpls,
+    difficultyWeights: collectDifficultyWeights('task'),
+    curseDifficultyWeights: collectDifficultyWeights('curse')
   };
 }
 
@@ -397,6 +416,8 @@ function previewGenerate() {
 async function loadLibrary() {
   library = await window.electronAPI.getLibrary();
   if (!library.curseTemplates) library.curseTemplates = [];
+  if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   render();
 }
 
@@ -446,6 +467,8 @@ btnSaveAll.addEventListener('click', async () => {
   const result = await window.electronAPI.saveLibrary(library);
   library = result.library;
   if (!library.curseTemplates) library.curseTemplates = [];
+  if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   render();
   showToast('Сохранено ✓');
 });
@@ -544,12 +567,22 @@ function renderTaskListFiltered() {
 
 function initCurseFilters() {
   const searchEl = document.getElementById('curse-search');
+  const diffChips = document.getElementById('curse-diff-chips');
   const tagChips  = document.getElementById('curse-tag-chips');
 
   if (searchEl) {
     searchEl.addEventListener('input', () => {
       filters.curses.search = searchEl.value.trim();
       renderCurseListFiltered();
+    });
+  }
+  if (diffChips) {
+    diffChips.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filters.curses.diff = btn.dataset.diff;
+        diffChips.querySelectorAll('.chip').forEach(b => b.classList.toggle('active', b === btn));
+        renderCurseListFiltered();
+      });
     });
   }
   function rebuildTagChips() {
