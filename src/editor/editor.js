@@ -94,6 +94,7 @@ function renderTaskList(container, items, allItems) {
       const id = Number(btn.dataset.deleteId);
       library.tasks = (allItems || library.tasks).filter(i => i.id !== id);
       renderTaskListFiltered();
+      scheduleAutoSave();
     });
   });
 }
@@ -133,6 +134,7 @@ function renderCurseList(container, items, allItems) {
       const id = Number(btn.dataset.deleteId);
       library.curses = (allItems || library.curses).filter(i => i.id !== id);
       renderCurseListFiltered();
+      scheduleAutoSave();
     });
   });
 }
@@ -221,6 +223,7 @@ function renderCurseTemplates() {
   renderTemplateList(curseTemplatesList, library.curseTemplates || [], 'ctmpl', id => {
     library.curseTemplates = (library.curseTemplates || []).filter(t => t.id !== id);
     renderCurseTemplates();
+    scheduleAutoSave();
   }, true);
 }
 
@@ -273,7 +276,7 @@ function renderPools() {
   `).join('');
 
   poolsList.querySelectorAll('.btn-delete-pool').forEach(btn => {
-    btn.addEventListener('click', () => { delete library.pools[btn.dataset.poolKey]; renderPools(); });
+    btn.addEventListener('click', () => { delete library.pools[btn.dataset.poolKey]; renderPools(); scheduleAutoSave(); });
   });
 
   poolsList.querySelectorAll('.btn-add-val').forEach(btn => {
@@ -287,6 +290,7 @@ function renderPools() {
         const inputs = card.querySelectorAll('.pool-value-input');
         if (inputs.length) inputs[inputs.length - 1].focus();
       }
+      scheduleAutoSave();
     });
   });
 
@@ -294,6 +298,7 @@ function renderPools() {
     btn.addEventListener('click', () => {
       library.pools[btn.dataset.poolKey].splice(Number(btn.dataset.valIdx), 1);
       renderPools();
+      scheduleAutoSave();
     });
   });
 }
@@ -412,6 +417,26 @@ function previewGenerate() {
   `;
 }
 
+// ─── Автосохранение ──────────────────────────────────────────────────────────
+let _autoSaveTimer = null;
+
+async function autoSave() {
+  collectAll();
+  await window.electronAPI.saveLibrary(library);
+  showToast('Сохранено ✓');
+}
+
+function scheduleAutoSave() {
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(autoSave, 500);
+}
+
+// Навешивает автосохранение на контейнер: input/change на полях, click на удаление
+function bindAutoSave(container) {
+  container.addEventListener('input', scheduleAutoSave);
+  container.addEventListener('change', scheduleAutoSave);
+}
+
 // ─── Загрузка ─────────────────────────────────────────────────────────────────
 async function loadLibrary() {
   library = await window.electronAPI.getLibrary();
@@ -427,13 +452,15 @@ btnAddTask.addEventListener('click', () => {
   renderTaskListFiltered();
   const inputs = tasksList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
+  scheduleAutoSave();
 });
 
 btnAddCurse.addEventListener('click', () => {
-  library.curses.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
+  library.curses.push({ id: nextId(allIds()), title: '', description: '', tags: [], difficulty: 'easy' });
   renderCurseListFiltered();
   const inputs = cursesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
+  scheduleAutoSave();
 });
 
 btnAddTemplate.addEventListener('click', () => {
@@ -441,14 +468,16 @@ btnAddTemplate.addEventListener('click', () => {
   renderTemplatesFiltered();
   const inputs = templatesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
+  scheduleAutoSave();
 });
 
 btnAddCurseTemplate.addEventListener('click', () => {
   if (!library.curseTemplates) library.curseTemplates = [];
-  library.curseTemplates.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
+  library.curseTemplates.push({ id: nextId(allIds()), title: '', description: '', tags: [], difficulty: 'easy' });
   renderCurseTemplates();
   const inputs = curseTemplatesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
+  scheduleAutoSave();
 });
 
 btnAddPool.addEventListener('click', () => {
@@ -460,6 +489,7 @@ btnAddPool.addEventListener('click', () => {
     const lastInput = cards[cards.length - 1].querySelector('.pool-name-input');
     if (lastInput) { lastInput.focus(); lastInput.select(); }
   }
+  scheduleAutoSave();
 });
 
 btnSaveAll.addEventListener('click', async () => {
@@ -494,6 +524,7 @@ btnPreview.addEventListener('click', () => previewGenerate());
 if (generatorToggle) {
   generatorToggle.addEventListener('change', () => {
     library.generatorEnabled = generatorToggle.checked;
+    // автосохранение навешено в DOMContentLoaded
   });
 }
 
@@ -628,6 +659,7 @@ function renderTemplatesFiltered() {
   renderTemplateList(templatesList, visible, 'tmpl', id => {
     library.templates = library.templates.filter(t => t.id !== id);
     renderTemplatesFiltered();
+    scheduleAutoSave();
   }, true);
   if (window._rebuildTmplTagChips) window._rebuildTmplTagChips();
 }
@@ -652,4 +684,21 @@ window.addEventListener('DOMContentLoaded', async () => {
   initCurseFilters();
   initTmplFilters();
   await loadLibrary();
+
+  // Автосохранение: поля в списках
+  bindAutoSave(tasksList);
+  bindAutoSave(cursesList);
+  bindAutoSave(templatesList);
+  bindAutoSave(curseTemplatesList);
+  bindAutoSave(poolsList);
+
+  // Автосохранение: шансы сложностей
+  document.querySelectorAll('.dw-input').forEach(el => {
+    el.addEventListener('change', scheduleAutoSave);
+  });
+
+  // Автосохранение: переключатель генератора
+  if (generatorToggle) {
+    generatorToggle.addEventListener('change', scheduleAutoSave);
+  }
 });
