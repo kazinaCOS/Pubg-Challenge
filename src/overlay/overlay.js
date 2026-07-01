@@ -16,8 +16,8 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', hard: 'Сложное' };
-const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
+const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое' };
+const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', heavy: 'diff-heavy' };
 
 function renderTasks(activeTasks) {
   if (!Array.isArray(activeTasks) || !activeTasks.length) {

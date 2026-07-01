@@ -23,8 +23,8 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', hard: 'Сложное' };
-const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
+const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое' };
+const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', heavy: 'diff-heavy' };
 
 function renderTasks(activeTasks) {
   if (!Array.isArray(activeTasks) || activeTasks.length === 0) {
@@ -37,18 +37,26 @@ function renderTasks(activeTasks) {
     const desc = task.description || '';
     const diff = task.difficulty || 'easy';
     const uid = task.uid || '';
+    const status = task.status || 'active';
     const genMark = task.generated ? '<span class="gen-mark">🎲</span>' : '';
+    const isDone = status === 'completed' || status === 'failed';
+    const statusBadge = status === 'completed'
+      ? '<span class="status-badge status-completed">✅ Выполнено</span>'
+      : status === 'failed'
+        ? '<span class="status-badge status-failed">❌ Провалено</span>'
+        : '';
     return `
-      <article class="task-card">
+      <article class="task-card ${isDone ? 'task-card-done task-card-' + status : ''}">
         <div class="task-card-head">
           <span class="diff-badge ${DIFF_CLASS[diff]}">${DIFF_LABEL[diff] || diff}</span>
           ${genMark}
+          ${statusBadge}
         </div>
         <div class="task-card-title">${escapeHtml(title)}</div>
         ${desc ? `<div class="task-card-desc">${escapeHtml(desc)}</div>` : ''}
         <div class="task-card-actions">
-          <button class="success btn-complete-task" data-uid="${escapeHtml(uid)}">✅ Выполнено</button>
-          <button class="danger btn-fail-task" data-uid="${escapeHtml(uid)}">❌ Провалено</button>
+          <button class="success btn-complete-task" data-uid="${escapeHtml(uid)}" ${isDone ? 'disabled' : ''}>✅ Выполнено</button>
+          <button class="danger btn-fail-task" data-uid="${escapeHtml(uid)}" ${isDone ? 'disabled' : ''}>❌ Провалено</button>
         </div>
       </article>
     `;

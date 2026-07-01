@@ -42,7 +42,8 @@ class StateManager {
     const title = typeof t.title === 'string' ? t.title : '';
     const description = typeof t.description === 'string' ? t.description : '';
     const tags = Array.isArray(t.tags) ? t.tags : [];
-    const difficulty = ['easy', 'medium', 'hard'].includes(t.difficulty) ? t.difficulty : 'easy';
+    const difficulty = ['easy', 'medium', 'heavy'].includes(t.difficulty) ? t.difficulty : 'easy';
+    const status = ['active', 'completed', 'failed'].includes(t.status) ? t.status : 'active';
     return {
       uid: t.uid,
       id: Number.isFinite(t.id) ? t.id : -1,
@@ -50,7 +51,8 @@ class StateManager {
       title,
       description,
       tags,
-      generated: t.generated === true
+      generated: t.generated === true,
+      status
     };
   }
 
@@ -142,15 +144,26 @@ class StateManager {
 
   // Устанавливает массив активных заданий (до 3)
   setActiveTasks(tasks) {
-    this.state.activeTasks = tasks.slice(0, 3);
+    this.state.activeTasks = tasks.slice(0, 3).map(t => ({ ...t, status: t.status || 'active' }));
   }
 
-  // Убирает задание из раунда по uid, возвращает убранное задание
-  removeActiveTask(uid) {
-    const idx = this.state.activeTasks.findIndex(t => t.uid === uid);
-    if (idx === -1) return null;
-    const [removed] = this.state.activeTasks.splice(idx, 1);
-    return removed;
+  // Помечает задание выполненным по uid
+  markTaskCompleted(uid) {
+    const t = this.state.activeTasks.find(t => t.uid === uid);
+    if (t) t.status = 'completed';
+    return t || null;
+  }
+
+  // Помечает задание проваленным по uid
+  markTaskFailed(uid) {
+    const t = this.state.activeTasks.find(t => t.uid === uid);
+    if (t) t.status = 'failed';
+    return t || null;
+  }
+
+  // Кол-во проваленных в текущем раунде
+  countFailedInRound() {
+    return this.state.activeTasks.filter(t => t.status === 'failed').length;
   }
 
   getActiveTasks() {

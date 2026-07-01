@@ -67,6 +67,60 @@ html, body {
   border-bottom-color: #ffe58a;
 }
 
+/* ── Filters ── */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.filter-search {
+  height: 32px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #0f1319;
+  color: #f5f7fb;
+  font-size: 13px;
+  outline: none;
+  width: 160px;
+  box-sizing: border-box;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  background: rgba(255,255,255,0.07);
+  color: #9aa6b3;
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chip:hover {
+  background: rgba(255,255,255,0.12);
+  color: #d0d8e4;
+}
+
+.chip.active {
+  background: rgba(255,213,74,0.18);
+  color: #ffd54a;
+  border-color: rgba(255,213,74,0.25);
+}
+
 /* ── Tab content ── */
 .tab-content {
   display: none;

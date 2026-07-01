@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const DIFFICULTIES = ['easy', 'medium', 'hard'];
+const DIFFICULTIES = ['easy', 'medium', 'heavy'];
 
 class TaskManager {
   constructor(tasksPath) {

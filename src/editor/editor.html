@@ -30,6 +30,16 @@
         <span class="hint">Название + описание + теги через запятую</span>
         <button id="btn-add-task">+ Добавить</button>
       </div>
+      <div class="filter-bar" id="filter-tasks">
+        <input class="filter-search" type="text" id="task-search" placeholder="🔍 Поиск...">
+        <div class="filter-chips" id="task-diff-chips">
+          <button class="chip active" data-diff="">Все</button>
+          <button class="chip" data-diff="easy">Лёгкое</button>
+          <button class="chip" data-diff="medium">Среднее</button>
+          <button class="chip" data-diff="heavy">Тяжёлое</button>
+        </div>
+        <div class="filter-chips" id="task-tag-chips"></div>
+      </div>
       <div id="tasks-list" class="list"></div>
     </section>
 
@@ -38,6 +48,10 @@
       <div class="panel-head">
         <span class="hint">Название + описание + теги через запятую</span>
         <button id="btn-add-curse">+ Добавить</button>
+      </div>
+      <div class="filter-bar" id="filter-curses">
+        <input class="filter-search" type="text" id="curse-search" placeholder="🔍 Поиск...">
+        <div class="filter-chips" id="curse-tag-chips"></div>
       </div>
       <div id="curses-list" class="list"></div>
     </section>
@@ -54,6 +68,16 @@
               <p class="hint">Используй <code>{имя_пула}</code> в названии или описании.<br>Пример: <code>Убить {количество} игроков с {оружие}</code></p>
             </div>
             <button id="btn-add-template">+ Добавить</button>
+          </div>
+          <div class="filter-bar">
+            <input class="filter-search" type="text" id="tmpl-search" placeholder="🔍 Поиск...">
+            <div class="filter-chips" id="tmpl-diff-chips">
+              <button class="chip active" data-diff="">Все</button>
+              <button class="chip" data-diff="easy">Лёгкое</button>
+              <button class="chip" data-diff="medium">Среднее</button>
+              <button class="chip" data-diff="heavy">Тяжёлое</button>
+            </div>
+            <div class="filter-chips" id="tmpl-tag-chips"></div>
           </div>
           <div id="templates-list" class="list"></div>
 

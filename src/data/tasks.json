@@ -40,7 +40,7 @@
       "title": "Окопник",
       "description": "Прокопать яму около дороги и просидеть в ней 30 секунд",
       "tags": ["укрытие"],
-      "difficulty": "hard"
+      "difficulty": "heavy"
     }
   ],
   "curses": [
@@ -106,7 +106,7 @@
       "title": "Снайпер на дистанции",
       "description": "Убить игрока с расстояния не менее {дистанция} из снайперской винтовки",
       "tags": ["оружие"],
-      "difficulty": "hard"
+      "difficulty": "heavy"
     },
     {
       "id": 3,
@@ -134,7 +134,7 @@
       "title": "Марафонец",
       "description": "Пробежать пешком от одного края зоны до другого за {время}",
       "tags": [],
-      "difficulty": "hard"
+      "difficulty": "heavy"
     }
   ],
   "curseTemplates": [

@@ -3,6 +3,12 @@
 // ─── Состояние ───────────────────────────────────────────────────────────────
 let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [] };
 
+const filters = {
+  tasks:  { search: '', diff: '', tag: '' },
+  curses: { search: '', tag: '' },
+  tmpls:  { search: '', diff: '', tag: '' }
+};
+
 // ─── DOM-узлы ────────────────────────────────────────────────────────────────
 const tasksList           = document.getElementById('tasks-list');
 const cursesList          = document.getElementById('curses-list');
@@ -53,9 +59,11 @@ function randFrom(arr) {
 }
 
 // ─── Рендер: задания (с полем difficulty) ────────────────────────────────────
-function renderTaskList(container, items) {
+function renderTaskList(container, items, allItems) {
   if (!items.length) {
-    container.innerHTML = `<div class="empty-hint">Нет записей. Нажми «+ Добавить».</div>`;
+    container.innerHTML = (filters.tasks.search || filters.tasks.diff || filters.tasks.tag)
+      ? `<div class="empty-hint">Нет заданий по фильтру.</div>`
+      : `<div class="empty-hint">Нет записей. Нажми «+ Добавить».</div>`;
     return;
   }
   container.innerHTML = items.map(item => `
@@ -67,7 +75,7 @@ function renderTaskList(container, items) {
           <select class="item-diff" data-field="difficulty" data-type="task" data-id="${item.id}">
             <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
-            <option value="hard" ${item.difficulty === 'hard' ? 'selected' : ''}>Сложное</option>
+            <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
           </select>
         </div>
         <textarea class="item-desc" data-field="description" data-type="task" data-id="${item.id}"
@@ -83,16 +91,18 @@ function renderTaskList(container, items) {
   container.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.deleteId);
-      library.tasks = library.tasks.filter(i => i.id !== id);
-      renderTaskList(container, library.tasks);
+      library.tasks = (allItems || library.tasks).filter(i => i.id !== id);
+      renderTaskListFiltered();
     });
   });
 }
 
 // ─── Рендер: наказания ───────────────────────────────────────────────────────
-function renderCurseList(container, items) {
+function renderCurseList(container, items, allItems) {
   if (!items.length) {
-    container.innerHTML = `<div class="empty-hint">Нет записей. Нажми «+ Добавить».</div>`;
+    container.innerHTML = (filters.curses.search || filters.curses.tag)
+      ? `<div class="empty-hint">Нет наказаний по фильтру.</div>`
+      : `<div class="empty-hint">Нет записей. Нажми «+ Добавить».</div>`;
     return;
   }
   container.innerHTML = items.map(item => `
@@ -113,8 +123,8 @@ function renderCurseList(container, items) {
   container.querySelectorAll('.btn-delete').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.deleteId);
-      library.curses = library.curses.filter(i => i.id !== id);
-      renderCurseList(container, library.curses);
+      library.curses = (allItems || library.curses).filter(i => i.id !== id);
+      renderCurseListFiltered();
     });
   });
 }
@@ -298,9 +308,9 @@ function collectPools() {
 
 // ─── Полный рендер ────────────────────────────────────────────────────────────
 function render() {
-  renderTaskList(tasksList, library.tasks);
-  renderCurseList(cursesList, library.curses);
-  renderTemplates();
+  renderTaskListFiltered();
+  renderCurseListFiltered();
+  renderTemplatesFiltered();
   renderCurseTemplates();
   renderPools();
   if (generatorToggle) generatorToggle.checked = library.generatorEnabled === true;
@@ -379,21 +389,21 @@ async function loadLibrary() {
 // ─── Кнопки ──────────────────────────────────────────────────────────────────
 btnAddTask.addEventListener('click', () => {
   library.tasks.push({ id: nextId(allIds()), title: '', description: '', tags: [], difficulty: 'easy' });
-  renderTaskList(tasksList, library.tasks);
+  renderTaskListFiltered();
   const inputs = tasksList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
 
 btnAddCurse.addEventListener('click', () => {
   library.curses.push({ id: nextId(allIds()), title: '', description: '', tags: [] });
-  renderCurseList(cursesList, library.curses);
+  renderCurseListFiltered();
   const inputs = cursesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
 
 btnAddTemplate.addEventListener('click', () => {
   library.templates.push({ id: nextId(allIds()), title: '', description: '', tags: [], difficulty: 'easy' });
-  renderTemplates();
+  renderTemplatesFiltered();
   const inputs = templatesList.querySelectorAll('.item-title');
   if (inputs.length) inputs[inputs.length - 1].focus();
 });
@@ -450,7 +460,132 @@ if (generatorToggle) {
   });
 }
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
+// ─── Фильтры ────────────────────────────────────────────────────────────────
+function buildTagChips(container, items, filterKey, tagKey, onUpdate) {
+  // Собираем уникальные теги
+  const allTags = new Set();
+  items.forEach(item => (item.tags || []).forEach(t => allTags.add(t)));
+  if (!allTags.size) { container.innerHTML = ''; return; }
+  const current = filters[filterKey][tagKey];
+  container.innerHTML = `<button class="chip ${!current ? 'active' : ''}" data-tag="">Все</button>` +
+    [...allTags].sort().map(t =>
+      `<button class="chip ${current === t ? 'active' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`
+    ).join('');
+  container.querySelectorAll('.chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filters[filterKey][tagKey] = btn.dataset.tag;
+      container.querySelectorAll('.chip').forEach(b => b.classList.toggle('active', b === btn));
+      onUpdate();
+    });
+  });
+}
+
+function applyFilter(items, f) {
+  let result = items;
+  if (f.search) {
+    const q = f.search.toLowerCase();
+    result = result.filter(i =>
+      (i.title || '').toLowerCase().includes(q) ||
+      (i.description || '').toLowerCase().includes(q) ||
+      (i.tags || []).some(t => t.toLowerCase().includes(q))
+    );
+  }
+  if (f.diff) result = result.filter(i => i.difficulty === f.diff);
+  if (f.tag)  result = result.filter(i => (i.tags || []).includes(f.tag));
+  return result;
+}
+
+function initTaskFilters() {
+  const searchEl = document.getElementById('task-search');
+  const diffChips = document.getElementById('task-diff-chips');
+  const tagChips  = document.getElementById('task-tag-chips');
+
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      filters.tasks.search = searchEl.value.trim();
+      renderTaskListFiltered();
+    });
+  }
+  if (diffChips) {
+    diffChips.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filters.tasks.diff = btn.dataset.diff;
+        diffChips.querySelectorAll('.chip').forEach(b => b.classList.toggle('active', b === btn));
+        renderTaskListFiltered();
+      });
+    });
+  }
+  // tag chips rebuilt on each render
+  function rebuildTagChips() {
+    buildTagChips(tagChips, library.tasks, 'tasks', 'tag', renderTaskListFiltered);
+  }
+  window._rebuildTaskTagChips = rebuildTagChips;
+}
+
+function renderTaskListFiltered() {
+  const visible = applyFilter(library.tasks, filters.tasks);
+  renderTaskList(tasksList, visible, library.tasks);
+  if (window._rebuildTaskTagChips) window._rebuildTaskTagChips();
+}
+
+function initCurseFilters() {
+  const searchEl = document.getElementById('curse-search');
+  const tagChips  = document.getElementById('curse-tag-chips');
+
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      filters.curses.search = searchEl.value.trim();
+      renderCurseListFiltered();
+    });
+  }
+  function rebuildTagChips() {
+    buildTagChips(tagChips, library.curses, 'curses', 'tag', renderCurseListFiltered);
+  }
+  window._rebuildCurseTagChips = rebuildTagChips;
+}
+
+function renderCurseListFiltered() {
+  const visible = applyFilter(library.curses, filters.curses);
+  renderCurseList(cursesList, visible, library.curses);
+  if (window._rebuildCurseTagChips) window._rebuildCurseTagChips();
+}
+
+function initTmplFilters() {
+  const searchEl = document.getElementById('tmpl-search');
+  const diffChips = document.getElementById('tmpl-diff-chips');
+  const tagChips  = document.getElementById('tmpl-tag-chips');
+
+  if (searchEl) {
+    searchEl.addEventListener('input', () => {
+      filters.tmpls.search = searchEl.value.trim();
+      renderTemplatesFiltered();
+    });
+  }
+  if (diffChips) {
+    diffChips.querySelectorAll('.chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filters.tmpls.diff = btn.dataset.diff;
+        diffChips.querySelectorAll('.chip').forEach(b => b.classList.toggle('active', b === btn));
+        renderTemplatesFiltered();
+      });
+    });
+  }
+  function rebuildTagChips() {
+    buildTagChips(tagChips, library.templates, 'tmpls', 'tag', renderTemplatesFiltered);
+  }
+  window._rebuildTmplTagChips = rebuildTagChips;
+}
+
+function renderTemplatesFiltered() {
+  const visible = applyFilter(library.templates, filters.tmpls);
+  renderTemplateList(templatesList, visible, 'tmpl', id => {
+    library.templates = library.templates.filter(t => t.id !== id);
+    renderTemplatesFiltered();
+  }, true);
+  if (window._rebuildTmplTagChips) window._rebuildTmplTagChips();
+}
+
+// Toast ────────────────────────────────────────────────────────────────────
 function showToast(message) {
   let toast = document.getElementById('editor-toast');
   if (!toast) {
@@ -466,5 +601,8 @@ function showToast(message) {
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
+  initTaskFilters();
+  initCurseFilters();
+  initTmplFilters();
   await loadLibrary();
 });

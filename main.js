@@ -71,11 +71,13 @@ function migrateTasksFile(targetPath, bundledPath) {
         data.tasks = bundled.tasks || [];
         changed = true;
       } else {
-        // Добавляем поле difficulty если отсутствует
+        // Добавляем поле difficulty, мигрируем hard → heavy
         let diffChanged = false;
         data.tasks = data.tasks.map(t => {
-          if (!t.difficulty) { diffChanged = true; return { ...t, difficulty: 'easy' }; }
-          return t;
+          let d = t.difficulty;
+          if (!d) { d = 'easy'; diffChanged = true; }
+          if (d === 'hard') { d = 'heavy'; diffChanged = true; }
+          return diffChanged ? { ...t, difficulty: d } : t;
         });
         if (diffChanged) changed = true;
       }
@@ -318,7 +320,7 @@ function buildRound() {
   if (easyTask) tasks.push(easyTask);
 
   // 2 рандомных (любая сложность)
-  const difficulties = ['easy', 'medium', 'hard'];
+  const difficulties = ['easy', 'medium', 'heavy'];
   for (let i = 0; i < 2; i++) {
     const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
     const t = pickOneTask(diff, activeCurses);
@@ -385,61 +387,26 @@ function registerHandlers() {
       return getPublicState();
     },
 
-    // Выполнить конкретное задание по uid — убрать из раунда, добавить новое
+    // Выполнить задание по uid — просто ставим статус completed
     completeTask: async (taskUid) => {
       if (taskUid) {
-        stateManager.removeActiveTask(taskUid);
+        stateManager.markTaskCompleted(taskUid);
       }
       stateManager.incrementCompleted();
-      // Добавляем новое задание вместо выполненного
-      const activeCurses = getActiveCurseObjects();
-      const difficulties = ['easy', 'medium', 'hard'];
-      const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
-      const newTask = pickOneTask(diff, activeCurses);
-      if (newTask) {
-        const current = stateManager.getActiveTasks();
-        current.push(newTask);
-        stateManager.setActiveTasks(current);
-      }
       await stateManager.saveState();
       return getPublicState();
     },
 
-    // Провалить конкретное задание по uid — убрать из раунда, если все провалены — дать наказания
+    // Провалить задание по uid — ставим статус failed, добавляем 1 наказание
     failTask: async (taskUid) => {
-      stateManager.incrementFailed();
       if (taskUid) {
-        stateManager.removeActiveTask(taskUid);
+        stateManager.markTaskFailed(taskUid);
       }
-
-      // Если в раунде больше нет заданий — выдаём наказания за провал
-      const remaining = stateManager.getActiveTasks();
-      if (remaining.length === 0) {
-        // Наказание за каждое проваленное задание в раунде (было 3, осталось 0 — это 1 провал за раз)
-        // Считаем сколько было провалено: дать 1 наказание за каждый вызов failTask без задания
-        if (stateManager.getActiveCursesCount() < 3) {
-          pickNextCurse();
-        }
-        // Запускаем новый раунд автоматически
-        const tasks = buildRound();
-        stateManager.setActiveTasks(tasks);
-      } else {
-        // Раунд ещё идёт — добавляем новое задание вместо проваленного
-        const activeCurses = getActiveCurseObjects();
-        const difficulties = ['easy', 'medium', 'hard'];
-        const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
-        const newTask = pickOneTask(diff, activeCurses);
-        if (newTask) {
-          const current = stateManager.getActiveTasks();
-          current.push(newTask);
-          stateManager.setActiveTasks(current);
-        }
-        // Наказание за провал
-        if (stateManager.getActiveCursesCount() < 3) {
-          pickNextCurse();
-        }
+      stateManager.incrementFailed();
+      // 1 наказание за каждый провал (до лимита 3)
+      if (stateManager.getActiveCursesCount() < 3) {
+        pickNextCurse();
       }
-
       await stateManager.saveState();
       return getPublicState();
     },
