@@ -31,8 +31,9 @@ function ensureUserDataFiles() {
       fs.copyFileSync(bundledStatePath, targetStatePath);
     } else {
       fs.writeFileSync(targetStatePath, JSON.stringify({
-        currentTaskId: null,
+        activeTasks: [],
         activeCurseIds: [],
+        generatedCurses: [],
         completed: 0,
         failed: 0,
         recentTaskIds: [],
@@ -46,7 +47,7 @@ function ensureUserDataFiles() {
     if (fs.existsSync(bundledTasksPath)) {
       fs.copyFileSync(bundledTasksPath, targetTasksPath);
     } else {
-      fs.writeFileSync(targetTasksPath, JSON.stringify({ tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [] }, null, 2), 'utf8');
+      fs.writeFileSync(targetTasksPath, JSON.stringify({ tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [] }, null, 2), 'utf8');
     }
   } else {
     migrateTasksFile(targetTasksPath, bundledTasksPath);
@@ -56,10 +57,6 @@ function ensureUserDataFiles() {
 }
 
 // Мигрирует userData/tasks.json: добавляет недостающие поля из bundled.
-// Правила:
-//   - tasks/curses: если массив пустой — копируем из bundled (пользователь ещё ничего не написал)
-//   - pools/templates: если поля отсутствуют — копируем из bundled
-//   - Если пользователь уже что-то написал (массив непустой) — не трогаем
 function migrateTasksFile(targetPath, bundledPath) {
   try {
     const raw = fs.readFileSync(targetPath, 'utf8');
@@ -73,6 +70,14 @@ function migrateTasksFile(targetPath, bundledPath) {
       if (!Array.isArray(data.tasks) || data.tasks.length === 0) {
         data.tasks = bundled.tasks || [];
         changed = true;
+      } else {
+        // Добавляем поле difficulty если отсутствует
+        let diffChanged = false;
+        data.tasks = data.tasks.map(t => {
+          if (!t.difficulty) { diffChanged = true; return { ...t, difficulty: 'easy' }; }
+          return t;
+        });
+        if (diffChanged) changed = true;
       }
       // curses: пустой массив → берём из bundled
       if (!Array.isArray(data.curses) || data.curses.length === 0) {
@@ -95,7 +100,6 @@ function migrateTasksFile(targetPath, bundledPath) {
         changed = true;
       }
     } else {
-      // bundled недоступен — просто убеждаемся что поля существуют
       if (!data.pools) { data.pools = {}; changed = true; }
       if (!data.templates) { data.templates = []; changed = true; }
     }
@@ -104,7 +108,7 @@ function migrateTasksFile(targetPath, bundledPath) {
       fs.writeFileSync(targetPath, JSON.stringify(data, null, 2), 'utf8');
     }
   } catch (_e) {
-    // Битый файл — не трогаем, TaskManager сам восстановит
+    // Битый файл — не трогаем
   }
 }
 
@@ -138,7 +142,7 @@ function getOverlayBoundsFromState() {
 function createControlWindow() {
   controlWindow = new BrowserWindow({
     width: 560,
-    height: 760,
+    height: 820,
     title: 'PUBG Challenge - Control',
     autoHideMenuBar: true,
     show: false,
@@ -256,18 +260,80 @@ function applyOverlayBoundsFromState() {
   overlayWindow.setBounds(bounds);
 }
 
-function getActiveCurses() {
+function getActiveCurseObjects() {
   const raw = stateManager.getPublicState();
-  return raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
+  const written = raw.activeCurseIds.map(id => taskManager.getCurseById(id)).filter(Boolean);
+  return [...written, ...(raw.generatedCurses || [])];
 }
 
-// Выбирает следующее наказание: 50/50 рукописное или сгенерированное (если генератор включён)
+// Генерирует uid для задания в раунде
+function makeUid() {
+  return `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+// Выбирает одно задание заданной сложности (50/50 генератор/рукописное если включён)
+function pickOneTask(difficulty, activeCurses) {
+  const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
+
+  if (genEnabled) {
+    const hasWritten = taskManager.library.tasks.filter(t => t.difficulty === difficulty).length > 0;
+    const hasTemplates = taskManager.library.templates.filter(t => t.difficulty === difficulty).length > 0;
+
+    if (!hasWritten && hasTemplates) {
+      const gen = taskManager.getGeneratedTask(activeCurses, difficulty);
+      if (gen) return { ...gen, uid: makeUid() };
+    } else if (hasWritten || hasTemplates) {
+      const useGen = Math.random() < 0.5;
+      if (useGen && hasTemplates) {
+        const gen = taskManager.getGeneratedTask(activeCurses, difficulty);
+        if (gen) return { ...gen, uid: makeUid() };
+      }
+    }
+  }
+
+  // Рукописное
+  const recentIds = stateManager.getPublicState().recentTaskIds;
+  const task = taskManager.getRandomTask(recentIds, activeCurses, difficulty);
+  if (task) {
+    stateManager.addRecentTask(task.id);
+    return { ...task, uid: makeUid() };
+  }
+
+  // Fallback: без фильтра по difficulty
+  const taskAny = taskManager.getRandomTask(recentIds, activeCurses);
+  if (taskAny) {
+    stateManager.addRecentTask(taskAny.id);
+    return { ...taskAny, uid: makeUid() };
+  }
+
+  return null;
+}
+
+// Формирует раунд: 1 easy + 2 случайных любой сложности
+function buildRound() {
+  const activeCurses = getActiveCurseObjects();
+  const tasks = [];
+
+  const easyTask = pickOneTask('easy', activeCurses);
+  if (easyTask) tasks.push(easyTask);
+
+  // 2 рандомных (любая сложность)
+  const difficulties = ['easy', 'medium', 'hard'];
+  for (let i = 0; i < 2; i++) {
+    const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
+    const t = pickOneTask(diff, activeCurses);
+    if (t) tasks.push(t);
+  }
+
+  return tasks;
+}
+
+// Выбирает следующее наказание
 function pickNextCurse() {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
   const activeCurseIds = stateManager.getActiveCurseIds();
 
   if (genEnabled && taskManager.library.curses.length === 0) {
-    // Есть шаблоны — генерируем наказание
     const gen = taskManager.getGeneratedCurse();
     if (gen) stateManager.addGeneratedCurse(gen);
     return;
@@ -282,45 +348,15 @@ function pickNextCurse() {
     }
   }
 
-  // Рукописное наказание
   const curse = taskManager.getRandomCurse(activeCurseIds);
   if (curse) stateManager.addActiveCurse(curse.id);
 }
 
-function pickNextTask() {
-  const state = stateManager.getPublicState();
-  const activeCurses = getActiveCurses();
-  const genEnabled = state.settings.generatorEnabled;
-
-  if (genEnabled && taskManager.library.tasks.length === 0) {
-    // Только генератор
-    const gen = taskManager.getGeneratedTask(activeCurses);
-    stateManager.setGeneratedTask(gen);
-    return;
-  }
-
-  if (genEnabled) {
-    // 50/50: генератор или рукописное
-    const useGen = Math.random() < 0.5;
-    if (useGen) {
-      const gen = taskManager.getGeneratedTask(activeCurses);
-      stateManager.setGeneratedTask(gen);
-      return;
-    }
-  }
-
-  // Рукописное задание
-  const nextTask = taskManager.getRandomTask(state.recentTaskIds || [], activeCurses);
-  if (nextTask) {
-    stateManager.setCurrentTask(nextTask.id);
-    stateManager.addRecentTask(nextTask.id);
-  }
-}
-
-function ensureInitialTask() {
+function ensureInitialRound() {
   const rawState = stateManager.getPublicState();
-  if (!rawState.currentTaskId) {
-    pickNextTask();
+  if (!rawState.activeTasks || rawState.activeTasks.length === 0) {
+    const tasks = buildRound();
+    stateManager.setActiveTasks(tasks);
   }
 }
 
@@ -341,27 +377,69 @@ function registerHandlers() {
   registerIpcHandlers(ipcMain, {
     getState: async () => getPublicState(),
 
-    newTask: async () => {
-      pickNextTask();
+    // Новый раунд — заменить все 3 задания
+    newRound: async () => {
+      const tasks = buildRound();
+      stateManager.setActiveTasks(tasks);
       await stateManager.saveState();
       return getPublicState();
     },
 
-    completeTask: async () => {
+    // Выполнить конкретное задание по uid — убрать из раунда, добавить новое
+    completeTask: async (taskUid) => {
+      if (taskUid) {
+        stateManager.removeActiveTask(taskUid);
+      }
       stateManager.incrementCompleted();
-      pickNextTask();
+      // Добавляем новое задание вместо выполненного
+      const activeCurses = getActiveCurseObjects();
+      const difficulties = ['easy', 'medium', 'hard'];
+      const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
+      const newTask = pickOneTask(diff, activeCurses);
+      if (newTask) {
+        const current = stateManager.getActiveTasks();
+        current.push(newTask);
+        stateManager.setActiveTasks(current);
+      }
       await stateManager.saveState();
       return getPublicState();
     },
 
-    failTask: async () => {
+    // Провалить конкретное задание по uid — убрать из раунда, если все провалены — дать наказания
+    failTask: async (taskUid) => {
       stateManager.incrementFailed();
-
-      if (stateManager.getActiveCursesCount() < 3) {
-        pickNextCurse();
+      if (taskUid) {
+        stateManager.removeActiveTask(taskUid);
       }
 
-      pickNextTask();
+      // Если в раунде больше нет заданий — выдаём наказания за провал
+      const remaining = stateManager.getActiveTasks();
+      if (remaining.length === 0) {
+        // Наказание за каждое проваленное задание в раунде (было 3, осталось 0 — это 1 провал за раз)
+        // Считаем сколько было провалено: дать 1 наказание за каждый вызов failTask без задания
+        if (stateManager.getActiveCursesCount() < 3) {
+          pickNextCurse();
+        }
+        // Запускаем новый раунд автоматически
+        const tasks = buildRound();
+        stateManager.setActiveTasks(tasks);
+      } else {
+        // Раунд ещё идёт — добавляем новое задание вместо проваленного
+        const activeCurses = getActiveCurseObjects();
+        const difficulties = ['easy', 'medium', 'hard'];
+        const diff = difficulties[Math.floor(Math.random() * difficulties.length)];
+        const newTask = pickOneTask(diff, activeCurses);
+        if (newTask) {
+          const current = stateManager.getActiveTasks();
+          current.push(newTask);
+          stateManager.setActiveTasks(current);
+        }
+        // Наказание за провал
+        if (stateManager.getActiveCursesCount() < 3) {
+          pickNextCurse();
+        }
+      }
+
       await stateManager.saveState();
       return getPublicState();
     },
@@ -396,6 +474,8 @@ function registerHandlers() {
 
     saveLibrary: async (payload) => {
       taskManager.saveLibrary(payload || {});
+      // Синхронизируем generatorEnabled в настройках состояния
+      stateManager.updateSettings({ generatorEnabled: payload.generatorEnabled === true });
       await stateManager.removeMissingIds(taskManager);
       await stateManager.saveState();
       return {
@@ -428,6 +508,7 @@ function registerHandlers() {
       const raw = fs.readFileSync(result.filePaths[0], 'utf8');
       const parsed = JSON.parse(raw);
       taskManager.saveLibrary(parsed);
+      stateManager.updateSettings({ generatorEnabled: parsed.generatorEnabled === true });
       await stateManager.removeMissingIds(taskManager);
       await stateManager.saveState();
       return { ok: true, library: taskManager.getLibrary(), state: getPublicState() };
@@ -440,7 +521,7 @@ async function initializeApp() {
   stateManager = createStateManager();
   taskManager = createTaskManager();
   await stateManager.loadState();
-  ensureInitialTask();
+  ensureInitialRound();
   await stateManager.saveState();
   registerHandlers();
   createControlWindow();

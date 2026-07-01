@@ -1,7 +1,7 @@
 function registerIpcHandlers(ipcMain, handlers) {
   const channels = [
     'app:getState',
-    'app:newTask',
+    'app:newRound',
     'app:completeTask',
     'app:failTask',
     'app:clearCurse',
@@ -19,9 +19,9 @@ function registerIpcHandlers(ipcMain, handlers) {
   });
 
   ipcMain.handle('app:getState', async () => handlers.getState());
-  ipcMain.handle('app:newTask', async () => handlers.newTask());
-  ipcMain.handle('app:completeTask', async () => handlers.completeTask());
-  ipcMain.handle('app:failTask', async () => handlers.failTask());
+  ipcMain.handle('app:newRound', async () => handlers.newRound());
+  ipcMain.handle('app:completeTask', async (_event, taskUid) => handlers.completeTask(taskUid));
+  ipcMain.handle('app:failTask', async (_event, taskUid) => handlers.failTask(taskUid));
   ipcMain.handle('app:clearCurse', async (_event, curseId) => handlers.clearCurse(curseId));
   ipcMain.handle('app:updateSettings', async (_event, payload) => handlers.updateSettings(payload));
   ipcMain.handle('app:resetProgress', async () => handlers.resetProgress());

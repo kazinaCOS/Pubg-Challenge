@@ -2,9 +2,9 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   getState: () => ipcRenderer.invoke('app:getState'),
-  newTask: () => ipcRenderer.invoke('app:newTask'),
-  completeTask: () => ipcRenderer.invoke('app:completeTask'),
-  failTask: () => ipcRenderer.invoke('app:failTask'),
+  newRound: () => ipcRenderer.invoke('app:newRound'),
+  completeTask: (taskUid) => ipcRenderer.invoke('app:completeTask', taskUid),
+  failTask: (taskUid) => ipcRenderer.invoke('app:failTask', taskUid),
   clearCurse: (curseId) => ipcRenderer.invoke('app:clearCurse', curseId),
   updateSettings: (payload) => ipcRenderer.invoke('app:updateSettings', payload),
   resetProgress: () => ipcRenderer.invoke('app:resetProgress'),

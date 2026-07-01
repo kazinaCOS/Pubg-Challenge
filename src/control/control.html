@@ -14,20 +14,17 @@
     </header>
 
     <section class="buttons">
-      <button id="btn-new-task" class="primary">🎲 Новое задание</button>
-      <button id="btn-complete" class="success">✅ Выполнено</button>
-      <button id="btn-fail" class="danger">❌ Провалено</button>
+      <button id="btn-new-round" class="primary">🔄 Новый раунд</button>
       <button id="btn-editor">📝 Редактор</button>
       <button id="btn-settings" class="secondary">⚙ Настройки</button>
     </section>
 
-    <section class="info">
-      <article class="card">
-        <div class="label">Текущее задание</div>
-        <div id="current-task-title" class="value task-title">Нет задания</div>
-        <div id="current-task-desc" class="task-desc"></div>
-      </article>
+    <!-- 3 карточки заданий -->
+    <section class="tasks-grid" id="tasks-grid">
+      <!-- генерируется через JS -->
+    </section>
 
+    <section class="info">
       <article class="card">
         <div class="label">Активные наказания</div>
         <div id="active-curses" class="curse-list">Нет активных наказаний</div>

@@ -1,5 +1,7 @@
 const fs = require('fs');
 
+const DIFFICULTIES = ['easy', 'medium', 'hard'];
+
 class TaskManager {
   constructor(tasksPath) {
     this.tasksPath = tasksPath;
@@ -25,8 +27,9 @@ class TaskManager {
     const title = typeof item.title === 'string' ? item.title.trim() : '';
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
+    const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
     if (!title && !description) return null;
-    return { id, title, description, tags };
+    return { id, title, description, tags, difficulty };
   }
 
   normalizeTemplate(item) {
@@ -36,8 +39,9 @@ class TaskManager {
     const title = typeof item.title === 'string' ? item.title.trim() : '';
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
+    const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
     if (!title && !description) return null;
-    return { id, title, description, tags };
+    return { id, title, description, tags, difficulty };
   }
 
   normalizePools(input) {
@@ -59,6 +63,21 @@ class TaskManager {
     return items.map(item => this.normalizeTemplate(item)).filter(Boolean);
   }
 
+  normalizeCurseTemplate(item) {
+    if (!item || typeof item !== 'object') return null;
+    const id = Number.isFinite(item.id) ? item.id : null;
+    if (!Number.isFinite(id)) return null;
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    const description = typeof item.description === 'string' ? item.description.trim() : '';
+    const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
+    if (!title && !description) return null;
+    return { id, title, description, tags };
+  }
+
+  normalizeCurseTemplates(items = []) {
+    return items.map(item => this.normalizeCurseTemplate(item)).filter(Boolean);
+  }
+
   normalizeLibrary(input) {
     const data = input && typeof input === 'object' ? input : {};
     return {
@@ -67,7 +86,7 @@ class TaskManager {
       generatorEnabled: data.generatorEnabled === true,
       pools: this.normalizePools(data.pools),
       templates: this.normalizeTemplates(data.templates),
-      curseTemplates: this.normalizeTemplates(data.curseTemplates)
+      curseTemplates: this.normalizeCurseTemplates(data.curseTemplates)
     };
   }
 
@@ -125,7 +144,7 @@ class TaskManager {
 
     const fill = (str) => str.replace(/\{([^}]+)\}/g, (match, key) => {
       const pool = pools[key];
-      if (!pool || !pool.length) return match; // оставляем как есть если пул не найден
+      if (!pool || !pool.length) return match;
       return pool[Math.floor(Math.random() * pool.length)];
     });
 
@@ -134,6 +153,7 @@ class TaskManager {
       title: fill(template.title),
       description: fill(template.description),
       tags: template.tags.slice(),
+      difficulty: template.difficulty || 'easy',
       generated: true,
       templateId: template.id
     };
@@ -149,10 +169,16 @@ class TaskManager {
     return false;
   }
 
-  // Генерирует задание из пула шаблонов, избегая конфликтов с наказаниями
-  getGeneratedTask(activeCurses = []) {
-    const templates = this.library.templates;
+  // Генерирует задание из пула шаблонов с заданной сложностью, избегая конфликтов
+  getGeneratedTask(activeCurses = [], difficulty = null) {
+    let templates = this.library.templates;
     if (!templates.length) return null;
+
+    // Фильтр по сложности если задан
+    if (difficulty) {
+      const byDiff = templates.filter(t => t.difficulty === difficulty);
+      if (byDiff.length) templates = byDiff;
+    }
 
     let available = templates.filter(t => !this.hasConflict(t, activeCurses));
     if (!available.length) available = templates;
@@ -172,22 +198,23 @@ class TaskManager {
     return filled;
   }
 
-  getRandomTask(recentTaskIds = [], activeCurses = []) {
+  // Рукописное задание по сложности
+  getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null) {
     let pool = this.library.tasks;
+
+    // Фильтр по сложности
+    if (difficulty) {
+      const byDiff = pool.filter(t => t.difficulty === difficulty);
+      if (byDiff.length) pool = byDiff;
+    }
 
     // Убираем недавние И конфликтные
     let available = pool.filter(t => !recentTaskIds.includes(t.id) && !this.hasConflict(t, activeCurses));
-
-    // Если всё отфильтровано по конфликту — игнорируем конфликт, берём не-недавние
     if (!available.length) available = pool.filter(t => !recentTaskIds.includes(t.id));
-
-    // Если все недавние — убираем хотя бы конфликтные
     if (!available.length) available = pool.filter(t => !this.hasConflict(t, activeCurses));
-
-    // Крайний случай — весь пул
     if (!available.length) available = pool;
-
     if (!available.length) return null;
+
     return available[Math.floor(Math.random() * available.length)];
   }
 

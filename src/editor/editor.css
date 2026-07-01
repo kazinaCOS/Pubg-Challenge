@@ -349,6 +349,47 @@ html, body {
   color: #5a6472;
 }
 
+.preview-diff {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.preview-diff.diff-easy { background: rgba(78,240,167,0.18); color: #4ef0a7; }
+.preview-diff.diff-medium { background: rgba(255,213,74,0.18); color: #ffd54a; }
+.preview-diff.diff-hard { background: rgba(255,127,127,0.18); color: #ff9090; }
+
+/* Difficulty selector inline with title */
+.item-top-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.item-top-row .item-title {
+  flex: 1;
+  margin-bottom: 0 !important;
+}
+
+.item-diff {
+  flex: 0 0 auto;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 10px;
+  padding: 0 10px;
+  background: #0f1319;
+  color: #f5f7fb;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  width: 100px;
+}
+
 /* ── Buttons ── */
 button {
   border: 0;

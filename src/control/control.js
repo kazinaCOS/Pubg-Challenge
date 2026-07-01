@@ -1,21 +1,7 @@
-const stateElements = {
-  currentTaskTitle: document.getElementById('current-task-title'),
-  currentTaskDesc: document.getElementById('current-task-desc'),
-  activeCurses: document.getElementById('active-curses'),
-  completed: document.getElementById('completed'),
-  failed: document.getElementById('failed')
-};
-
-const buttons = {
-  newTask: document.getElementById('btn-new-task'),
-  complete: document.getElementById('btn-complete'),
-  fail: document.getElementById('btn-fail'),
-  editor: document.getElementById('btn-editor'),
-  settings: document.getElementById('btn-settings'),
-  saveSettings: document.getElementById('btn-save-settings'),
-  resetProgress: document.getElementById('btn-reset-progress'),
-  closeSettings: document.getElementById('btn-close-settings')
-};
+const tasksGrid = document.getElementById('tasks-grid');
+const activeCursesEl = document.getElementById('active-curses');
+const completedEl = document.getElementById('completed');
+const failedEl = document.getElementById('failed');
 
 const modal = document.getElementById('settings-modal');
 const modalBackdrop = document.querySelector('.modal-backdrop');
@@ -27,7 +13,6 @@ const settingsInputs = {
   overlayHeight: document.getElementById('overlay-height')
 };
 
-// Флаг — пока настройки открыты, не перезаписываем поля из state
 let settingsOpen = false;
 
 function escapeHtml(value) {
@@ -38,28 +23,63 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-function renderTask(task) {
-  if (!task) {
-    stateElements.currentTaskTitle.textContent = 'Нет задания';
-    stateElements.currentTaskDesc.textContent = '';
+const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', hard: 'Сложное' };
+const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
+
+function renderTasks(activeTasks) {
+  if (!Array.isArray(activeTasks) || activeTasks.length === 0) {
+    tasksGrid.innerHTML = '<div class="no-tasks">Нет активных заданий. Нажми «Новый раунд».</div>';
     return;
   }
-  const title = typeof task === 'object' ? (task.title || task.text || '') : String(task);
-  const desc = typeof task === 'object' ? (task.description || '') : '';
-  stateElements.currentTaskTitle.textContent = title || 'Нет задания';
-  stateElements.currentTaskDesc.textContent = desc;
+
+  tasksGrid.innerHTML = activeTasks.map(task => {
+    const title = task.title || 'Без названия';
+    const desc = task.description || '';
+    const diff = task.difficulty || 'easy';
+    const uid = task.uid || '';
+    const genMark = task.generated ? '<span class="gen-mark">🎲</span>' : '';
+    return `
+      <article class="task-card">
+        <div class="task-card-head">
+          <span class="diff-badge ${DIFF_CLASS[diff]}">${DIFF_LABEL[diff] || diff}</span>
+          ${genMark}
+        </div>
+        <div class="task-card-title">${escapeHtml(title)}</div>
+        ${desc ? `<div class="task-card-desc">${escapeHtml(desc)}</div>` : ''}
+        <div class="task-card-actions">
+          <button class="success btn-complete-task" data-uid="${escapeHtml(uid)}">✅ Выполнено</button>
+          <button class="danger btn-fail-task" data-uid="${escapeHtml(uid)}">❌ Провалено</button>
+        </div>
+      </article>
+    `;
+  }).join('');
+
+  tasksGrid.querySelectorAll('.btn-complete-task').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uid = btn.dataset.uid;
+      const state = await window.electronAPI.completeTask(uid);
+      renderState(state);
+    });
+  });
+
+  tasksGrid.querySelectorAll('.btn-fail-task').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const uid = btn.dataset.uid;
+      const state = await window.electronAPI.failTask(uid);
+      renderState(state);
+    });
+  });
 }
 
 function renderCurses(activeCurses) {
   if (!Array.isArray(activeCurses) || !activeCurses.length) {
-    stateElements.activeCurses.textContent = 'Нет активных наказаний';
+    activeCursesEl.textContent = 'Нет активных наказаний';
     return;
   }
 
-  stateElements.activeCurses.innerHTML = activeCurses.map(curse => {
+  activeCursesEl.innerHTML = activeCurses.map(curse => {
     const title = curse.title || curse.text || '';
     const desc = curse.description || '';
-    // Сгенерированные наказания идентифицируются по genId, рукописные — по id
     const removeKey = curse.genId || curse.id;
     return `
       <div class="curse-item">
@@ -70,10 +90,9 @@ function renderCurses(activeCurses) {
     `;
   }).join('');
 
-  Array.from(stateElements.activeCurses.querySelectorAll('[data-curse-id]')).forEach(button => {
+  Array.from(activeCursesEl.querySelectorAll('[data-curse-id]')).forEach(button => {
     button.addEventListener('click', async () => {
       const raw = button.getAttribute('data-curse-id');
-      // genId — строка вида 'gen_...', рукописное — число
       const curseId = raw.startsWith('gen_') ? raw : Number(raw);
       const state = await window.electronAPI.clearCurse(curseId);
       renderState(state);
@@ -82,7 +101,6 @@ function renderCurses(activeCurses) {
 }
 
 function renderSettings(settings) {
-  // Не трогаем инпуты пока модалка открыта — пользователь может редактировать
   if (settingsOpen) return;
   const s = settings || {};
   settingsInputs.overlayX.value = Number.isFinite(s.overlayX) ? s.overlayX : 20;
@@ -93,10 +111,10 @@ function renderSettings(settings) {
 
 function renderState(state) {
   if (!state) return;
-  renderTask(state.currentTask);
+  renderTasks(state.activeTasks || []);
   renderCurses(state.activeCurses || []);
-  stateElements.completed.textContent = String(state.completed ?? 0);
-  stateElements.failed.textContent = String(state.failed ?? 0);
+  completedEl.textContent = String(state.completed ?? 0);
+  failedEl.textContent = String(state.failed ?? 0);
   renderSettings(state.settings);
 }
 
@@ -126,40 +144,28 @@ function getSettingsPayload() {
 
 async function saveSettings() {
   const state = await window.electronAPI.updateSettings(getSettingsPayload());
-  settingsOpen = false; // разрешаем рендер перед закрытием
+  settingsOpen = false;
   renderState(state);
   closeSettings();
 }
 
-async function resetProgress() {
-  const result = await window.electronAPI.resetProgress();
-  if (result && result.state) renderState(result.state);
-}
-
 async function initialize() {
-  buttons.newTask.addEventListener('click', async () => {
-    const state = await window.electronAPI.newTask();
+  document.getElementById('btn-new-round').addEventListener('click', async () => {
+    const state = await window.electronAPI.newRound();
     renderState(state);
   });
 
-  buttons.complete.addEventListener('click', async () => {
-    const state = await window.electronAPI.completeTask();
-    renderState(state);
-  });
-
-  buttons.fail.addEventListener('click', async () => {
-    const state = await window.electronAPI.failTask();
-    renderState(state);
-  });
-
-  buttons.editor.addEventListener('click', async () => {
+  document.getElementById('btn-editor').addEventListener('click', async () => {
     await window.electronAPI.openEditor();
   });
 
-  buttons.settings.addEventListener('click', () => openSettings());
-  buttons.closeSettings.addEventListener('click', () => closeSettings());
-  buttons.saveSettings.addEventListener('click', async () => { await saveSettings(); });
-  buttons.resetProgress.addEventListener('click', async () => { await resetProgress(); });
+  document.getElementById('btn-settings').addEventListener('click', () => openSettings());
+  document.getElementById('btn-close-settings').addEventListener('click', () => closeSettings());
+  document.getElementById('btn-save-settings').addEventListener('click', async () => { await saveSettings(); });
+  document.getElementById('btn-reset-progress').addEventListener('click', async () => {
+    const result = await window.electronAPI.resetProgress();
+    if (result && result.state) renderState(result.state);
+  });
 
   if (modalBackdrop) {
     modalBackdrop.addEventListener('click', () => closeSettings());

@@ -1,6 +1,5 @@
 const elements = {
-  taskTitle: document.getElementById('overlay-task-title'),
-  taskDesc: document.getElementById('overlay-task-desc'),
+  tasks: document.getElementById('overlay-tasks'),
   curses: document.getElementById('overlay-curses'),
   cursesEmpty: document.getElementById('overlay-curses-empty'),
   completed: document.getElementById('overlay-completed'),
@@ -17,15 +16,30 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;');
 }
 
-function getTaskTitle(task) {
-  if (!task) return 'Нет задания';
-  if (typeof task === 'object') return task.title || task.text || 'Нет задания';
-  return String(task);
-}
+const DIFF_LABEL = { easy: 'Лёгкое', medium: 'Среднее', hard: 'Сложное' };
+const DIFF_CLASS = { easy: 'diff-easy', medium: 'diff-medium', hard: 'diff-hard' };
 
-function getTaskDesc(task) {
-  if (!task || typeof task !== 'object') return '';
-  return task.description || '';
+function renderTasks(activeTasks) {
+  if (!Array.isArray(activeTasks) || !activeTasks.length) {
+    elements.tasks.innerHTML = '<div class="no-task">Нет заданий</div>';
+    return;
+  }
+
+  elements.tasks.innerHTML = activeTasks.map(task => {
+    const title = task.title || task.text || 'Без названия';
+    const desc = task.description || '';
+    const diff = task.difficulty || 'easy';
+    const genMark = task.generated ? ' 🎲' : '';
+    return `
+      <div class="task-row">
+        <span class="diff-pill ${DIFF_CLASS[diff]}">${DIFF_LABEL[diff] || diff}${genMark}</span>
+        <div class="task-info">
+          <span class="task-title">${escapeHtml(title)}</span>
+          ${desc ? `<span class="task-desc">${escapeHtml(desc)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderCurses(activeCurses) {
@@ -49,28 +63,21 @@ function renderCurses(activeCurses) {
 }
 
 function renderState(state) {
-  const title = getTaskTitle(state.currentTask);
-  const desc = getTaskDesc(state.currentTask);
-
-  elements.taskTitle.textContent = title;
-  elements.taskDesc.textContent = desc;
-  elements.taskDesc.style.display = desc ? 'block' : 'none';
-
+  renderTasks(state.activeTasks || []);
   elements.completed.textContent = String(state.completed ?? 0);
   elements.failed.textContent = String(state.failed ?? 0);
   renderCurses(state.activeCurses || []);
 }
 
 function renderError(message) {
-  elements.taskTitle.textContent = 'Ошибка overlay';
-  elements.taskDesc.textContent = message;
+  elements.tasks.innerHTML = `<div class="no-task">Ошибка: ${escapeHtml(message)}</div>`;
   elements.completed.textContent = '!';
   elements.failed.textContent = '!';
 }
 
 function serializeState(state) {
   return JSON.stringify({
-    currentTask: state.currentTask,
+    activeTasks: state.activeTasks,
     activeCurses: state.activeCurses,
     completed: state.completed,
     failed: state.failed

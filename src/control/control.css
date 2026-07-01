@@ -15,34 +15,35 @@ body {
   box-sizing: border-box;
   width: 100%;
   height: 100vh;
-  padding: 18px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
+  overflow-y: auto;
 }
 
 .header h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 24px;
 }
 
 .subtitle {
-  margin: 4px 0 0;
+  margin: 2px 0 0;
   color: #a8b0bb;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .buttons {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
 }
 
 button {
   border: 0;
   border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 14px;
+  padding: 10px 12px;
+  font-size: 13px;
   font-weight: 700;
   color: #0c0f14;
   background: #dbe2ea;
@@ -65,11 +66,98 @@ button.secondary {
   background: linear-gradient(180deg, #b9c4d3 0%, #8f9bae 100%);
 }
 
+/* 3 карточки заданий */
+.tasks-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.no-tasks {
+  grid-column: 1 / -1;
+  color: #9aa6b3;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px;
+}
+
+.task-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-sizing: border-box;
+}
+
+.task-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diff-badge {
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.diff-easy {
+  background: rgba(78, 240, 167, 0.18);
+  color: #4ef0a7;
+}
+
+.diff-medium {
+  background: rgba(255, 213, 74, 0.18);
+  color: #ffd54a;
+}
+
+.diff-hard {
+  background: rgba(255, 127, 127, 0.18);
+  color: #ff9090;
+}
+
+.gen-mark {
+  font-size: 12px;
+}
+
+.task-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffe58a;
+  word-break: break-word;
+  line-height: 1.3;
+  flex: 1;
+}
+
+.task-card-desc {
+  font-size: 12px;
+  color: #c8d4e0;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.task-card-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.task-card-actions button {
+  font-size: 11px;
+  padding: 7px 4px;
+  border-radius: 10px;
+}
+
+/* info section */
 .info {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
+  gap: 10px;
   flex: 1;
 }
 
@@ -77,37 +165,22 @@ button.secondary {
 .stat {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 14px;
+  border-radius: 14px;
+  padding: 12px;
   backdrop-filter: blur(10px);
 }
 
 .label {
   display: block;
   color: #9aa6b3;
-  font-size: 12px;
+  font-size: 11px;
   margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
 
-.task-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #ffe58a;
-  word-break: break-word;
-}
-
-.task-desc {
-  font-size: 14px;
-  color: #c8d4e0;
-  margin-top: 6px;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
 .curse-list {
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.35;
   word-break: break-word;
 }
@@ -116,7 +189,7 @@ button.secondary {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   position: relative;
 }
@@ -131,34 +204,34 @@ button.secondary {
 }
 
 .curse-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: #ffb0b0;
   padding-right: 70px;
 }
 
 .curse-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: #e0c8c8;
   line-height: 1.35;
 }
 
 .curse-close {
   position: absolute;
-  top: 8px;
+  top: 6px;
   right: 0;
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 5px 9px;
+  font-size: 11px;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .stat .value {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 800;
 }
 
@@ -202,7 +275,7 @@ button.secondary {
 
 .modal-content h2 {
   margin: 0 0 16px;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .field-row {
