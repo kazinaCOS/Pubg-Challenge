@@ -353,36 +353,50 @@ function render() {
 }
 
 // ─── Сбор всего перед сохранением ────────────────────────────────────────────
+// Вспомогательная: читает видимые в DOM элементы и мёржит их в существующий массив library.
+// Невидимые (отфильтрованные) записи остаются нетронутыми.
+function mergeVisibleIntoLibrary(container, libArray, typeAttr, dataAttr) {
+  container.querySelectorAll(`.item[data-type="${typeAttr}"]`).forEach(row => {
+    const id = Number(row.dataset.id);
+    const item = libArray.find(i => i.id === id);
+    if (!item) return;
+    const get = (sel) => { const el = row.querySelector(sel); return el ? el.value.trim() : ''; };
+    item.title       = get(`input[data-field="title"]`);
+    item.description = get(`textarea[data-field="description"]`);
+    const tagsRaw    = get(`input[data-field="tags"]`);
+    item.tags        = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl     = row.querySelector(`select[data-field="difficulty"]`);
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+}
+
+// То же для шаблонов (другой data-атрибут)
+function mergeVisibleTemplates(container, libArray, dataAttr) {
+  container.querySelectorAll(`.item[data-${dataAttr}-id]`).forEach(row => {
+    const id = Number(row.getAttribute(`data-${dataAttr}-id`));
+    const item = libArray.find(i => i.id === id);
+    if (!item) return;
+    const get = (sel) => { const el = row.querySelector(sel); return el ? el.value.trim() : ''; };
+    item.title       = get(`input[data-${dataAttr}-field="title"]`);
+    item.description = get(`textarea[data-${dataAttr}-field="description"]`);
+    const tagsRaw    = get(`input[data-${dataAttr}-field="tags"]`);
+    item.tags        = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+    const diffEl     = row.querySelector(`select[data-${dataAttr}-field="difficulty"]`);
+    if (diffEl) item.difficulty = diffEl.value;
+  });
+}
+
 function collectAll() {
-  const tasks          = collectTaskList(tasksList);
-  const curses         = collectCurseList(cursesList);
-  const templates      = collectTemplateList(templatesList, 'tmpl', true);
-  const curseTemplates = collectTemplateList(curseTemplatesList, 'ctmpl', false);
-  const pools          = collectPools();
+  // Мёржим видимые изменения в существующие массивы (не заменяем целиком)
+  mergeVisibleIntoLibrary(tasksList,  library.tasks,  'task',  'field');
+  mergeVisibleIntoLibrary(cursesList, library.curses, 'curse', 'field');
+  mergeVisibleTemplates(templatesList,      library.templates,              'tmpl');
+  mergeVisibleTemplates(curseTemplatesList, library.curseTemplates || [],   'ctmpl');
 
-  const fixIds = (items, offset = 0) => items.map((item, i) => ({
-    ...item,
-    id: Number.isFinite(item.id) && item.id > 0 ? item.id : offset + i + 1
-  }));
-
-  const fixedTasks         = fixIds(tasks);
-  const maxTaskId          = fixedTasks.reduce((m, i) => Math.max(m, i.id), 0);
-  const fixedCurses        = fixIds(curses, maxTaskId);
-  const maxCurseId         = fixedCurses.reduce((m, i) => Math.max(m, i.id), maxTaskId);
-  const fixedTemplates     = fixIds(templates, maxCurseId);
-  const maxTmplId          = fixedTemplates.reduce((m, i) => Math.max(m, i.id), maxCurseId);
-  const fixedCurseTmpls    = fixIds(curseTemplates, maxTmplId);
-
-  library = {
-    tasks: fixedTasks,
-    curses: fixedCurses,
-    generatorEnabled: generatorToggle ? generatorToggle.checked : library.generatorEnabled,
-    pools,
-    templates: fixedTemplates,
-    curseTemplates: fixedCurseTmpls,
-    difficultyWeights: collectDifficultyWeights('task'),
-    curseDifficultyWeights: collectDifficultyWeights('curse')
-  };
+  library.pools                  = collectPools();
+  library.generatorEnabled       = generatorToggle ? generatorToggle.checked : library.generatorEnabled;
+  library.difficultyWeights      = collectDifficultyWeights('task');
+  library.curseDifficultyWeights = collectDifficultyWeights('curse');
 }
 
 // ─── Превью генератора ────────────────────────────────────────────────────────
@@ -420,75 +434,8 @@ function previewGenerate() {
 // ─── Автосохранение ──────────────────────────────────────────────────────────
 let _autoSaveTimer = null;
 
-// Патчит library из DOM без уничтожения отфильтрованных (невидимых) элементов.
-// Для каждого видимого элемента обновляет соответствующую запись в library по id.
-function patchLibraryFromDOM() {
-  // Tasks
-  tasksList.querySelectorAll('.item[data-type="task"]').forEach(row => {
-    const id = Number(row.dataset.id);
-    const item = library.tasks.find(t => t.id === id);
-    if (!item) return;
-    item.title = row.querySelector('input[data-field="title"]').value.trim();
-    item.description = row.querySelector('textarea[data-field="description"]').value.trim();
-    const tagsRaw = row.querySelector('input[data-field="tags"]').value.trim();
-    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const diffEl = row.querySelector('select[data-field="difficulty"]');
-    if (diffEl) item.difficulty = diffEl.value;
-  });
-
-  // Curses
-  cursesList.querySelectorAll('.item[data-type="curse"]').forEach(row => {
-    const id = Number(row.dataset.id);
-    const item = library.curses.find(c => c.id === id);
-    if (!item) return;
-    item.title = row.querySelector('input[data-field="title"]').value.trim();
-    item.description = row.querySelector('textarea[data-field="description"]').value.trim();
-    const tagsRaw = row.querySelector('input[data-field="tags"]').value.trim();
-    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const diffEl = row.querySelector('select[data-field="difficulty"]');
-    if (diffEl) item.difficulty = diffEl.value;
-  });
-
-  // Templates (task)
-  templatesList.querySelectorAll('.item[data-tmpl-id]').forEach(row => {
-    const id = Number(row.getAttribute('data-tmpl-id'));
-    const item = library.templates.find(t => t.id === id);
-    if (!item) return;
-    item.title = row.querySelector('input[data-tmpl-field="title"]').value.trim();
-    item.description = row.querySelector('textarea[data-tmpl-field="description"]').value.trim();
-    const tagsRaw = row.querySelector('input[data-tmpl-field="tags"]').value.trim();
-    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const diffEl = row.querySelector('select[data-tmpl-field="difficulty"]');
-    if (diffEl) item.difficulty = diffEl.value;
-  });
-
-  // CurseTemplates
-  curseTemplatesList.querySelectorAll('.item[data-ctmpl-id]').forEach(row => {
-    const id = Number(row.getAttribute('data-ctmpl-id'));
-    if (!library.curseTemplates) library.curseTemplates = [];
-    const item = library.curseTemplates.find(t => t.id === id);
-    if (!item) return;
-    item.title = row.querySelector('input[data-ctmpl-field="title"]').value.trim();
-    item.description = row.querySelector('textarea[data-ctmpl-field="description"]').value.trim();
-    const tagsRaw = row.querySelector('input[data-ctmpl-field="tags"]').value.trim();
-    item.tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
-    const diffEl = row.querySelector('select[data-ctmpl-field="difficulty"]');
-    if (diffEl) item.difficulty = diffEl.value;
-  });
-
-  // Pools (всегда полный список в DOM)
-  library.pools = collectPools();
-
-  // difficultyWeights
-  library.difficultyWeights = collectDifficultyWeights('task');
-  library.curseDifficultyWeights = collectDifficultyWeights('curse');
-
-  // generatorEnabled
-  if (generatorToggle) library.generatorEnabled = generatorToggle.checked;
-}
-
 async function autoSave() {
-  patchLibraryFromDOM();
+  collectAll(); // теперь безопасен — мёржит, не заменяет
   await window.electronAPI.saveLibrary(library);
   showToast('Сохранено ✓');
 }
