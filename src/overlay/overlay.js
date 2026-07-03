@@ -161,9 +161,11 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Режим drag-resize
   const dragHandle = document.getElementById('drag-handle');
+  const dragBorder = document.getElementById('drag-border');
   if (window.electronAPI && window.electronAPI.onDragMode) {
     window.electronAPI.onDragMode((active) => {
       if (dragHandle) dragHandle.style.display = active ? 'flex' : 'none';
+      if (dragBorder) dragBorder.style.display = active ? 'block' : 'none';
     });
   }
 });

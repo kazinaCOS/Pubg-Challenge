@@ -17,6 +17,7 @@ const settingsInputs = {
 const opacityVal = document.getElementById('opacity-val');
 
 let dragModeActive = false;
+let prevOverlayBounds = null; // bounds перед входом в drag-режим
 
 let settingsOpen = false;
 
@@ -195,8 +196,11 @@ async function initialize() {
   if (btnDrag) {
     btnDrag.addEventListener('click', async () => {
       if (!dragModeActive) {
+        // Сохраняем текущие bounds перед входом в drag
+        const cur = getSettingsPayload();
+        prevOverlayBounds = { overlayX: cur.overlayX, overlayY: cur.overlayY, overlayWidth: cur.overlayWidth, overlayHeight: cur.overlayHeight };
         dragModeActive = true;
-        btnDrag.textContent = '✅ Готово (зафиксировать)';
+        btnDrag.textContent = '✅ Зафиксировать';
         btnDrag.classList.remove('secondary');
         btnDrag.classList.add('primary');
         modal.classList.remove('open');
@@ -204,7 +208,7 @@ async function initialize() {
         await window.electronAPI.startDragResize();
       } else {
         dragModeActive = false;
-        btnDrag.textContent = '🖱 Переместить/изменить размер оверлея';
+        btnDrag.textContent = '🖱 Переместить/размер';
         btnDrag.classList.remove('primary');
         btnDrag.classList.add('secondary');
         const result = await window.electronAPI.stopDragResize();
@@ -213,6 +217,29 @@ async function initialize() {
       }
     });
   }
+  // Кнопка отмены позиции/размера оверлея
+  const btnRevert = document.getElementById('btn-revert-overlay');
+  if (btnRevert) {
+    btnRevert.addEventListener('click', async () => {
+      if (!prevOverlayBounds) return;
+      // Если drag активен — сначала выходим из него
+      if (dragModeActive) {
+        dragModeActive = false;
+        const btnDrag = document.getElementById('btn-drag-overlay');
+        if (btnDrag) {
+          btnDrag.textContent = '🖱 Переместить/размер';
+          btnDrag.classList.remove('primary');
+          btnDrag.classList.add('secondary');
+        }
+        await window.electronAPI.stopDragResize();
+      }
+      // Восстанавливаем предыдущие значения
+      const state = await window.electronAPI.updateSettings(prevOverlayBounds);
+      if (state) renderState(state);
+      openSettings();
+    });
+  }
+
   document.getElementById('btn-reset-progress').addEventListener('click', async () => {
     const result = await window.electronAPI.resetProgress();
     if (result && result.state) renderState(result.state);

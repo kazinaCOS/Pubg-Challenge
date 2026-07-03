@@ -231,12 +231,16 @@ body {
 .diff-brutal { background: linear-gradient(135deg, #8b00ff, #ff0055); color: #fff; }
 
 /* Drag-resize mode */
+/* Полоса сверху — drag зона. Края окна остаются свободными для системного resize */
 .drag-handle {
   position: fixed;
-  inset: 0;
-  background: rgba(74, 143, 255, 0.15);
-  border: 2px dashed rgba(74, 143, 255, 0.7);
-  border-radius: 1.2em;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 36px;
+  background: rgba(74, 143, 255, 0.25);
+  border: 2px dashed rgba(74, 143, 255, 0.8);
+  border-radius: 1.2em 1.2em 0 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -245,12 +249,22 @@ body {
   cursor: move;
 }
 
+/* Рамка по краям в режиме drag */
+.drag-border {
+  position: fixed;
+  inset: 0;
+  border: 2px dashed rgba(74, 143, 255, 0.6);
+  border-radius: 1.2em;
+  pointer-events: none;
+  z-index: 9998;
+}
+
 .drag-hint {
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  text-shadow: 0 1px 4px rgba(0,0,0,0.9);
   -webkit-app-region: no-drag;
   pointer-events: none;
-  text-align: center;
+  white-space: nowrap;
 }
