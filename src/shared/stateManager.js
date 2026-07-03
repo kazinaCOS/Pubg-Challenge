@@ -36,7 +36,8 @@ class StateManager {
       overlayWidth: Number.isFinite(inputSettings.overlayWidth) ? Math.max(300, inputSettings.overlayWidth) : defaults.overlayWidth,
       overlayHeight: Number.isFinite(inputSettings.overlayHeight) ? Math.max(120, inputSettings.overlayHeight) : defaults.overlayHeight,
       generatorEnabled: inputSettings.generatorEnabled === true,
-      overlayTitlesOnly: inputSettings.overlayTitlesOnly === true
+      overlayTitlesOnly: inputSettings.overlayTitlesOnly === true,
+      overlayBgOpacity: Number.isFinite(inputSettings.overlayBgOpacity) ? Math.min(1, Math.max(0, inputSettings.overlayBgOpacity)) : 0.78
     };
   }
 

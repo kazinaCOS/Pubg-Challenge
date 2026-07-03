@@ -11,7 +11,9 @@ function registerIpcHandlers(ipcMain, handlers) {
     'app:getLibrary',
     'app:saveLibrary',
     'app:exportLibrary',
-    'app:importLibrary'
+    'app:importLibrary',
+    'app:startDragResize',
+    'app:stopDragResize'
   ];
 
   channels.forEach(channel => {
@@ -30,6 +32,8 @@ function registerIpcHandlers(ipcMain, handlers) {
   ipcMain.handle('app:saveLibrary', async (_event, payload) => handlers.saveLibrary(payload));
   ipcMain.handle('app:exportLibrary', async () => handlers.exportLibrary());
   ipcMain.handle('app:importLibrary', async () => handlers.importLibrary());
+  ipcMain.handle('app:startDragResize', async () => handlers.startDragResize());
+  ipcMain.handle('app:stopDragResize', async () => handlers.stopDragResize());
 }
 
 module.exports = { registerIpcHandlers };
