@@ -155,6 +155,99 @@ async function updateFromMain() {
   }
 }
 
+// ─── Drag & Resize (вместо системного т.к. frame:false+transparent) ─────────────────────
+const EDGE = 8; // ширина зоны resize по краям
+
+function getEdge(e) {
+  const W = window.innerWidth, H = window.innerHeight;
+  const x = e.clientX, y = e.clientY;
+  const l = x < EDGE, r = x > W - EDGE, t = y < EDGE, b = y > H - EDGE;
+  if (l && t) return 'nw';
+  if (r && t) return 'ne';
+  if (l && b) return 'sw';
+  if (r && b) return 'se';
+  if (l) return 'w';
+  if (r) return 'e';
+  if (t) return 'n';
+  if (b) return 's';
+  return null;
+}
+
+const CURSORS = { n:'n-resize', s:'s-resize', e:'e-resize', w:'w-resize', ne:'ne-resize', nw:'nw-resize', se:'se-resize', sw:'sw-resize' };
+
+function initDragResize(dragHandle, dragBorder) {
+  let mode = null; // 'move' | edge string
+  let startX, startY, startBounds;
+  let dragActive = false;
+
+  // Прокси для получения текущих bounds из window
+  function getCurrentBounds() {
+    return {
+      x: window.screenX, y: window.screenY,
+      width: window.outerWidth, height: window.outerHeight
+    };
+  }
+
+  function updateCursor(e) {
+    const edge = getEdge(e);
+    document.body.style.cursor = edge ? (CURSORS[edge] || 'default') : 'default';
+    if (dragHandle) dragHandle.style.cursor = 'move';
+  }
+
+  // Моусьдовн move на всём window в режиме
+  document.addEventListener('mousemove', (e) => {
+    if (!dragActive) return;
+    if (!mode) { updateCursor(e); return; }
+    const dx = e.screenX - startX;
+    const dy = e.screenY - startY;
+    const b = { ...startBounds };
+
+    if (mode === 'move') {
+      window.electronAPI.moveOverlay({ x: b.x + dx, y: b.y + dy });
+      return;
+    }
+
+    // resize
+    let { x, y, width, height } = b;
+    if (mode.includes('e')) width += dx;
+    if (mode.includes('s')) height += dy;
+    if (mode.includes('w')) { x += dx; width -= dx; }
+    if (mode.includes('n')) { y += dy; height -= dy; }
+    window.electronAPI.resizeOverlay({ x, y, width, height });
+  });
+
+  document.addEventListener('mouseup', () => { mode = null; });
+
+  // drag-handle: move
+  if (dragHandle) {
+    dragHandle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      mode = 'move';
+      startX = e.screenX; startY = e.screenY;
+      startBounds = getCurrentBounds();
+    });
+  }
+
+  // Границы окна: resize
+  document.addEventListener('mousedown', (e) => {
+    if (!dragActive) return;
+    if (dragHandle && dragHandle.contains(e.target)) return; // уже обработан
+    const edge = getEdge(e);
+    if (!edge) return;
+    e.preventDefault();
+    mode = edge;
+    startX = e.screenX; startY = e.screenY;
+    startBounds = getCurrentBounds();
+  });
+
+  return {
+    setActive(val) {
+      dragActive = val;
+      if (!val) { mode = null; document.body.style.cursor = ''; }
+    }
+  };
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
   await updateFromMain();
   setInterval(updateFromMain, 300);
@@ -162,8 +255,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Режим drag-resize
   const dragHandle = document.getElementById('drag-handle');
   const dragBorder = document.getElementById('drag-border');
+  const drCtrl = initDragResize(dragHandle, dragBorder);
+
   if (window.electronAPI && window.electronAPI.onDragMode) {
     window.electronAPI.onDragMode((active) => {
+      drCtrl.setActive(active);
       if (dragHandle) dragHandle.style.display = active ? 'flex' : 'none';
       if (dragBorder) dragBorder.style.display = active ? 'block' : 'none';
     });

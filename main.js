@@ -569,6 +569,22 @@ function registerHandlers() {
       return { ok: true, state: getPublicState() };
     },
 
+    moveOverlay: async ({ x, y }) => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      const b = overlayWindow.getBounds();
+      overlayWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: b.width, height: b.height });
+    },
+
+    resizeOverlay: async ({ x, y, width, height }) => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      overlayWindow.setBounds({
+        x: Math.round(x),
+        y: Math.round(y),
+        width: Math.max(300, Math.round(width)),
+        height: Math.max(120, Math.round(height))
+      });
+    },
+
     importLibrary: async () => {
       const result = await dialog.showOpenDialog(controlWindow || null, {
         title: 'Импорт библиотеки заданий',

@@ -13,7 +13,9 @@ function registerIpcHandlers(ipcMain, handlers) {
     'app:exportLibrary',
     'app:importLibrary',
     'app:startDragResize',
-    'app:stopDragResize'
+    'app:stopDragResize',
+    'app:moveOverlay',
+    'app:resizeOverlay'
   ];
 
   channels.forEach(channel => {
@@ -34,6 +36,8 @@ function registerIpcHandlers(ipcMain, handlers) {
   ipcMain.handle('app:importLibrary', async () => handlers.importLibrary());
   ipcMain.handle('app:startDragResize', async () => handlers.startDragResize());
   ipcMain.handle('app:stopDragResize', async () => handlers.stopDragResize());
+  ipcMain.handle('app:moveOverlay', async (_e, p) => handlers.moveOverlay(p));
+  ipcMain.handle('app:resizeOverlay', async (_e, p) => handlers.resizeOverlay(p));
 }
 
 module.exports = { registerIpcHandlers };

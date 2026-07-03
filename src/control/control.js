@@ -17,7 +17,23 @@ const settingsInputs = {
 const opacityVal = document.getElementById('opacity-val');
 
 let dragModeActive = false;
-let prevOverlayBounds = null; // bounds перед входом в drag-режим
+const BOUNDS_HISTORY_MAX = 10;
+let boundsHistory = []; // undo-стек
+let boundsRedo = [];    // redo-стек
+
+function pushBoundsHistory(bounds) {
+  boundsHistory.push(bounds);
+  if (boundsHistory.length > BOUNDS_HISTORY_MAX) boundsHistory.shift();
+  boundsRedo = []; // новое действие сбрасывает redo
+  updateRevertButtons();
+}
+
+function updateRevertButtons() {
+  const btnUndo = document.getElementById('btn-revert-overlay');
+  const btnRedo = document.getElementById('btn-redo-overlay');
+  if (btnUndo) btnUndo.disabled = boundsHistory.length === 0;
+  if (btnRedo) btnRedo.disabled = boundsRedo.length === 0;
+}
 
 let settingsOpen = false;
 
@@ -196,9 +212,9 @@ async function initialize() {
   if (btnDrag) {
     btnDrag.addEventListener('click', async () => {
       if (!dragModeActive) {
-        // Сохраняем текущие bounds перед входом в drag
+        // Сохраняем текущие bounds в историю перед входом в drag
         const cur = getSettingsPayload();
-        prevOverlayBounds = { overlayX: cur.overlayX, overlayY: cur.overlayY, overlayWidth: cur.overlayWidth, overlayHeight: cur.overlayHeight };
+        pushBoundsHistory({ overlayX: cur.overlayX, overlayY: cur.overlayY, overlayWidth: cur.overlayWidth, overlayHeight: cur.overlayHeight });
         dragModeActive = true;
         btnDrag.textContent = '✅ Зафиксировать';
         btnDrag.classList.remove('secondary');
@@ -217,26 +233,41 @@ async function initialize() {
       }
     });
   }
-  // Кнопка отмены позиции/размера оверлея
+  // Кнопка Undo
   const btnRevert = document.getElementById('btn-revert-overlay');
   if (btnRevert) {
+    btnRevert.disabled = true;
     btnRevert.addEventListener('click', async () => {
-      if (!prevOverlayBounds) return;
-      // Если drag активен — сначала выходим из него
+      if (!boundsHistory.length) return;
+      // Сохраняем текущее в redo
+      const cur = getSettingsPayload();
+      boundsRedo.push({ overlayX: cur.overlayX, overlayY: cur.overlayY, overlayWidth: cur.overlayWidth, overlayHeight: cur.overlayHeight });
+      const prev = boundsHistory.pop();
+      updateRevertButtons();
       if (dragModeActive) {
         dragModeActive = false;
         const btnDrag = document.getElementById('btn-drag-overlay');
-        if (btnDrag) {
-          btnDrag.textContent = '🖱 Переместить/размер';
-          btnDrag.classList.remove('primary');
-          btnDrag.classList.add('secondary');
-        }
+        if (btnDrag) { btnDrag.textContent = '🖱 Переместить/размер'; btnDrag.classList.remove('primary'); btnDrag.classList.add('secondary'); }
         await window.electronAPI.stopDragResize();
       }
-      // Восстанавливаем предыдущие значения
-      const state = await window.electronAPI.updateSettings(prevOverlayBounds);
+      const state = await window.electronAPI.updateSettings(prev);
       if (state) renderState(state);
-      openSettings();
+    });
+  }
+
+  // Кнопка Redo
+  const btnRedo = document.getElementById('btn-redo-overlay');
+  if (btnRedo) {
+    btnRedo.disabled = true;
+    btnRedo.addEventListener('click', async () => {
+      if (!boundsRedo.length) return;
+      const cur = getSettingsPayload();
+      boundsHistory.push({ overlayX: cur.overlayX, overlayY: cur.overlayY, overlayWidth: cur.overlayWidth, overlayHeight: cur.overlayHeight });
+      if (boundsHistory.length > BOUNDS_HISTORY_MAX) boundsHistory.shift();
+      const next = boundsRedo.pop();
+      updateRevertButtons();
+      const state = await window.electronAPI.updateSettings(next);
+      if (state) renderState(state);
     });
   }
 
