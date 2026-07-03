@@ -80,6 +80,11 @@ function renderState(state) {
   elements.completed.textContent = String(state.completed ?? 0);
   elements.failed.textContent = String(state.failed ?? 0);
   renderCurses(state.activeCurses || [], titlesOnly);
+  // Прозрачность фона
+  const op = Number.isFinite(state.settings && state.settings.overlayBgOpacity)
+    ? state.settings.overlayBgOpacity
+    : 0.78;
+  document.documentElement.style.setProperty('--overlay-bg-opacity', op);
   autoScale();
 }
 

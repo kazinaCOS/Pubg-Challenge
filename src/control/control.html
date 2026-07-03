@@ -70,12 +70,23 @@
         </label>
       </div>
 
+      <div class="field-row">
+        <label class="field" style="flex:1">
+          <span>Прозрачность фона (<span id="opacity-val">78</span>%)</span>
+          <input id="overlay-bg-opacity" type="range" min="0" max="100" step="1" style="width:100%">
+        </label>
+      </div>
+
       <div class="field-row toggle-row">
         <label class="toggle-label">
           <span>Только названия в оверлее</span>
           <input id="overlay-titles-only" type="checkbox">
           <span class="toggle-switch"></span>
         </label>
+      </div>
+
+      <div class="field-row" style="margin-top:4px">
+        <button id="btn-drag-overlay" class="secondary" style="width:100%">🖱 Переместить/изменить размер оверлея</button>
       </div>
 
       <div class="modal-actions">

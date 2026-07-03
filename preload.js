@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLibrary: () => ipcRenderer.invoke('app:getLibrary'),
   saveLibrary: (payload) => ipcRenderer.invoke('app:saveLibrary', payload),
   exportLibrary: () => ipcRenderer.invoke('app:exportLibrary'),
-  importLibrary: () => ipcRenderer.invoke('app:importLibrary')
+  importLibrary: () => ipcRenderer.invoke('app:importLibrary'),
+  startDragResize: () => ipcRenderer.invoke('app:startDragResize'),
+  stopDragResize: () => ipcRenderer.invoke('app:stopDragResize')
 });

@@ -11,8 +11,12 @@ const settingsInputs = {
   overlayY: document.getElementById('overlay-y'),
   overlayWidth: document.getElementById('overlay-width'),
   overlayHeight: document.getElementById('overlay-height'),
-  overlayTitlesOnly: document.getElementById('overlay-titles-only')
+  overlayTitlesOnly: document.getElementById('overlay-titles-only'),
+  overlayBgOpacity: document.getElementById('overlay-bg-opacity')
 };
+const opacityVal = document.getElementById('opacity-val');
+
+let dragModeActive = false;
 
 let settingsOpen = false;
 
@@ -117,6 +121,9 @@ function renderSettings(settings) {
   settingsInputs.overlayWidth.value = Number.isFinite(s.overlayWidth) ? s.overlayWidth : 620;
   settingsInputs.overlayHeight.value = Number.isFinite(s.overlayHeight) ? s.overlayHeight : 260;
   if (settingsInputs.overlayTitlesOnly) settingsInputs.overlayTitlesOnly.checked = s.overlayTitlesOnly === true;
+  const opPct = Number.isFinite(s.overlayBgOpacity) ? Math.round(s.overlayBgOpacity * 100) : 78;
+  if (settingsInputs.overlayBgOpacity) settingsInputs.overlayBgOpacity.value = opPct;
+  if (opacityVal) opacityVal.textContent = opPct;
 }
 
 function renderState(state) {
@@ -144,12 +151,14 @@ function closeSettings() {
 }
 
 function getSettingsPayload() {
+  const opPct = settingsInputs.overlayBgOpacity ? Number(settingsInputs.overlayBgOpacity.value) : 78;
   return {
     overlayX: Number(settingsInputs.overlayX.value),
     overlayY: Number(settingsInputs.overlayY.value),
     overlayWidth: Number(settingsInputs.overlayWidth.value),
     overlayHeight: Number(settingsInputs.overlayHeight.value),
-    overlayTitlesOnly: settingsInputs.overlayTitlesOnly ? settingsInputs.overlayTitlesOnly.checked : false
+    overlayTitlesOnly: settingsInputs.overlayTitlesOnly ? settingsInputs.overlayTitlesOnly.checked : false,
+    overlayBgOpacity: opPct / 100
   };
 }
 
@@ -173,6 +182,37 @@ async function initialize() {
   document.getElementById('btn-settings').addEventListener('click', () => openSettings());
   document.getElementById('btn-close-settings').addEventListener('click', () => closeSettings());
   document.getElementById('btn-save-settings').addEventListener('click', async () => { await saveSettings(); });
+
+  // Слайдер прозрачности — live preview label
+  if (settingsInputs.overlayBgOpacity) {
+    settingsInputs.overlayBgOpacity.addEventListener('input', () => {
+      if (opacityVal) opacityVal.textContent = settingsInputs.overlayBgOpacity.value;
+    });
+  }
+
+  // Кнопка drag-resize
+  const btnDrag = document.getElementById('btn-drag-overlay');
+  if (btnDrag) {
+    btnDrag.addEventListener('click', async () => {
+      if (!dragModeActive) {
+        dragModeActive = true;
+        btnDrag.textContent = '✅ Готово (зафиксировать)';
+        btnDrag.classList.remove('secondary');
+        btnDrag.classList.add('primary');
+        modal.classList.remove('open');
+        settingsOpen = false;
+        await window.electronAPI.startDragResize();
+      } else {
+        dragModeActive = false;
+        btnDrag.textContent = '🖱 Переместить/изменить размер оверлея';
+        btnDrag.classList.remove('primary');
+        btnDrag.classList.add('secondary');
+        const result = await window.electronAPI.stopDragResize();
+        if (result && result.state) renderState(result.state);
+        openSettings();
+      }
+    });
+  }
   document.getElementById('btn-reset-progress').addEventListener('click', async () => {
     const result = await window.electronAPI.resetProgress();
     if (result && result.state) renderState(result.state);

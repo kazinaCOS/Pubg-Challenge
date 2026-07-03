@@ -11,6 +11,10 @@ body {
   pointer-events: none;
 }
 
+:root {
+  --overlay-bg-opacity: 0.78;
+}
+
 .overlay {
   position: absolute;
   top: 0;
@@ -27,7 +31,7 @@ body {
   gap: 0.6em;
   max-width: 640px;
   padding: 0.85em 1em;
-  background: rgba(8, 10, 14, 0.78);
+  background: rgba(8, 10, 14, var(--overlay-bg-opacity));
   border: 1px solid rgba(255, 255, 255, 0.10);
   border-radius: 1.2em;
   color: #ffffff;

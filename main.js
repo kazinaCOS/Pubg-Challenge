@@ -37,7 +37,7 @@ function ensureUserDataFiles() {
         completed: 0,
         failed: 0,
         recentTaskIds: [],
-        settings: { overlayX: 20, overlayY: 20, overlayWidth: 620, overlayHeight: 260, generatorEnabled: false }
+        settings: { overlayX: 20, overlayY: 20, overlayWidth: 620, overlayHeight: 260, generatorEnabled: false, overlayBgOpacity: 0.78 }
       }, null, 2), 'utf8');
     }
   }
@@ -547,6 +547,24 @@ function registerHandlers() {
     },
 
     // Импорт tasks.json из файла на диске
+    startDragResize: async () => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      overlayWindow.setIgnoreMouseEvents(false);
+      overlayWindow.setMovable(true);
+      overlayWindow.setResizable(true);
+      overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      return { ok: true };
+    },
+
+    stopDragResize: async () => {
+      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      const b = overlayWindow.getBounds();
+      stateManager.updateSettings({ overlayX: b.x, overlayY: b.y, overlayWidth: b.width, overlayHeight: b.height });
+      await stateManager.saveState();
+      overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      return { ok: true, state: getPublicState() };
+    },
+
     importLibrary: async () => {
       const result = await dialog.showOpenDialog(controlWindow || null, {
         title: 'Импорт библиотеки заданий',
