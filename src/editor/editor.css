@@ -660,6 +660,11 @@ button.danger { background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%); c
   cursor: pointer;
 }
 
+.excl-type-sel option {
+  background: #ffffff;
+  color: #111111;
+}
+
 .excl-search-input {
   flex: 1;
   min-width: 160px;
