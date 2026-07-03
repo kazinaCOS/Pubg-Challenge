@@ -390,3 +390,6 @@ button.secondary {
 .toggle-label input[type="checkbox"]:checked + .toggle-switch::after {
   transform: translateX(18px);
 }
+
+/* Brutal difficulty */
+.diff-brutal { background: linear-gradient(135deg, #8b00ff, #ff0055); color: #fff; }

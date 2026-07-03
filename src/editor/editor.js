@@ -1,7 +1,7 @@
 'use strict';
 
 // ─── Состояние ───────────────────────────────────────────────────────────────
-let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [], difficultyWeights: { easy: 3, medium: 2, heavy: 1 }, curseDifficultyWeights: { easy: 3, medium: 2, heavy: 1 }, exclusionGroups: [] };
+let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [], difficultyWeights: { easy: 3, medium: 2, heavy: 1, brutal: 0 }, curseDifficultyWeights: { easy: 3, medium: 2, heavy: 1, brutal: 0 }, categoryWeights: {}, curseCategoryWeights: {}, exclusionGroups: [] };
 
 const filters = {
   tasks:  { search: '', diff: '', tag: '' },
@@ -76,6 +76,8 @@ function renderTaskList(container, items, allItems) {
             <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
             <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
+          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
+          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
           </select>
         </div>
         <textarea class="item-desc" data-field="description" data-type="task" data-id="${item.id}"
@@ -117,6 +119,8 @@ function renderCurseList(container, items, allItems) {
             <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
             <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
+          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
+          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
           </select>
         </div>
         <textarea class="item-desc" data-field="description" data-type="curse" data-id="${item.id}"
@@ -124,6 +128,14 @@ function renderCurseList(container, items, allItems) {
         <input class="item-tags" type="text" data-field="tags" data-type="curse" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
           value="${esc((item.tags || []).join(', '))}">
+        <label class="item-weight-row">
+          <span class="item-weight-label">Индивид. шанс</span>
+          <input class="item-weight" type="number" min="0" max="999" step="0.5"
+            data-field="weight" data-type="curse" data-id="${item.id}"
+            placeholder="авто"
+            value="${item.weight != null ? item.weight : ''}">
+          <span class="item-weight-hint">пусто = по сложности/категории</span>
+        </label>
       </div>
       <button class="danger btn-delete" data-delete-type="curse" data-delete-id="${item.id}">✕</button>
     </div>
@@ -149,8 +161,12 @@ function collectTaskList(container) {
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     const diffEl = row.querySelector(`select[data-field="difficulty"]`);
     const difficulty = diffEl ? diffEl.value : 'easy';
+    const weightElT = row.querySelector(`input[data-field="weight"]`);
+    const weightValT = weightElT && weightElT.value.trim() !== '' ? Number(weightElT.value) : null;
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags, difficulty });
+    const itemT = { id, title, description: desc, tags, difficulty };
+    if (weightValT != null && !isNaN(weightValT)) itemT.weight = weightValT;
+    result.push(itemT);
   });
   return result;
 }
@@ -165,8 +181,12 @@ function collectCurseList(container) {
     const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     const diffEl = row.querySelector(`select[data-field="difficulty"]`);
     const difficulty = diffEl ? diffEl.value : 'easy';
+    const weightElC = row.querySelector(`input[data-field="weight"]`);
+    const weightValC = weightElC && weightElC.value.trim() !== '' ? Number(weightElC.value) : null;
     if (!title && !desc) return;
-    result.push({ id, title, description: desc, tags, difficulty });
+    const itemC = { id, title, description: desc, tags, difficulty };
+    if (weightValC != null && !isNaN(weightValC)) itemC.weight = weightValC;
+    result.push(itemC);
   });
   return result;
 }
@@ -188,6 +208,7 @@ function renderTemplateList(container, items, dataAttr, deleteFn, showDiff = fal
             <option value="easy" ${item.difficulty === 'easy' || !item.difficulty ? 'selected' : ''}>Лёгкое</option>
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
             <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
+          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
           </select>
         </div>
         ` : `
@@ -320,25 +341,75 @@ function collectPools() {
 }
 
 // ─── Шансы сложностей ────────────────────────────────────────────────────────
+const DIFF_KEYS = ['easy', 'medium', 'heavy', 'brutal'];
+const DIFF_NAMES = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое', brutal: 'Потужно' };
+
 function collectDifficultyWeights(type) {
   const prefix = type === 'task' ? 'dw' : 'cdw';
   const result = {};
-  for (const d of ['easy', 'medium', 'heavy']) {
+  for (const d of DIFF_KEYS) {
     const el = document.getElementById(`${prefix}-${d}`);
-    result[d] = el ? Math.max(0, Number(el.value) || 0) : (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+    result[d] = el ? Math.max(0, Number(el.value) || 0) : 0;
   }
   return result;
 }
 
+function collectCategoryWeights(type) {
+  const containerId = type === 'task' ? 'cw-task-list' : 'cw-curse-list';
+  const container = document.getElementById(containerId);
+  if (!container) return {};
+  const result = {};
+  container.querySelectorAll('.cw-row').forEach(row => {
+    const tag = row.querySelector('.cw-tag').value.trim();
+    const val = Number(row.querySelector('.cw-val').value);
+    if (tag && !isNaN(val) && val >= 0) result[tag] = val;
+  });
+  return result;
+}
+
+function renderCategoryWeights(type) {
+  const weights = type === 'task'
+    ? (library.categoryWeights || {})
+    : (library.curseCategoryWeights || {});
+  const containerId = type === 'task' ? 'cw-task-list' : 'cw-curse-list';
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const entries = Object.entries(weights);
+  container.innerHTML = entries.map(([tag, val], i) => `
+    <div class="cw-row" data-cw-idx="${i}">
+      <input class="cw-tag" type="text" placeholder="тег/категория" value="${esc(tag)}">
+      <input class="cw-val" type="number" min="0" max="999" step="0.5" value="${val}">
+      <button class="danger cw-del">✕</button>
+    </div>
+  `).join('') || '<div class="empty-hint">Нет категорий.</div>';
+
+  container.querySelectorAll('.cw-del').forEach((btn, i) => {
+    btn.addEventListener('click', () => {
+      const entries2 = Object.entries(type === 'task' ? (library.categoryWeights || {}) : (library.curseCategoryWeights || {}));
+      entries2.splice(i, 1);
+      if (type === 'task') library.categoryWeights = Object.fromEntries(entries2);
+      else library.curseCategoryWeights = Object.fromEntries(entries2);
+      renderCategoryWeights(type);
+      scheduleAutoSave();
+    });
+  });
+  container.querySelectorAll('.cw-tag, .cw-val').forEach(el => {
+    el.addEventListener('input', scheduleAutoSave);
+  });
+}
+
 function renderDifficultyWeights() {
-  const dw = library.difficultyWeights || { easy: 3, medium: 2, heavy: 1 };
-  const cdw = library.curseDifficultyWeights || { easy: 3, medium: 2, heavy: 1 };
-  for (const d of ['easy', 'medium', 'heavy']) {
-    const el = document.getElementById(`dw-${d}`);
-    if (el) el.value = dw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+  const dw  = library.difficultyWeights  || {};
+  const cdw = library.curseDifficultyWeights || {};
+  for (const d of DIFF_KEYS) {
+    const el  = document.getElementById(`dw-${d}`);
+    if (el) el.value = dw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : d === 'heavy' ? 1 : 0);
     const cel = document.getElementById(`cdw-${d}`);
-    if (cel) cel.value = cdw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : 1);
+    if (cel) cel.value = cdw[d] ?? (d === 'easy' ? 3 : d === 'medium' ? 2 : d === 'heavy' ? 1 : 0);
   }
+  renderCategoryWeights('task');
+  renderCategoryWeights('curse');
 }
 
 // ─── Полный рендер ────────────────────────────────────────────────────────────
@@ -368,6 +439,12 @@ function mergeVisibleIntoLibrary(container, libArray, typeAttr, dataAttr) {
     item.tags        = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
     const diffEl     = row.querySelector(`select[data-field="difficulty"]`);
     if (diffEl) item.difficulty = diffEl.value;
+    const weightEl = row.querySelector(`input[data-field="weight"]`);
+    if (weightEl) {
+      const wv = weightEl.value.trim();
+      if (wv !== '') item.weight = Number(wv);
+      else delete item.weight;
+    }
   });
 }
 
@@ -398,7 +475,9 @@ function collectAll() {
   library.generatorEnabled       = generatorToggle ? generatorToggle.checked : library.generatorEnabled;
   library.difficultyWeights      = collectDifficultyWeights('task');
   library.curseDifficultyWeights = collectDifficultyWeights('curse');
-  // exclusionGroups уже живёт в library напрямую (изменяется через renderExclusionGroups)
+  library.categoryWeights        = collectCategoryWeights('task');
+  library.curseCategoryWeights   = collectCategoryWeights('curse');
+  // exclusionGroups уже живёт в library напрямую
 }
 
 // ─── Превью генератора ────────────────────────────────────────────────────────
@@ -423,7 +502,7 @@ function previewGenerate() {
   const title = fill(template.title);
   const desc  = fill(template.description);
   const diff  = template.difficulty || 'easy';
-  const diffLabel = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое' }[diff] || diff;
+  const diffLabel = { easy: 'Лёгкое', medium: 'Среднее', heavy: 'Тяжёлое', brutal: 'Потужно' }[diff] || diff;
 
   previewOutput.innerHTML = `
     <div class="preview-diff diff-${diff}">${esc(diffLabel)}</div>
@@ -612,6 +691,8 @@ async function loadLibrary() {
   if (!library.curseTemplates) library.curseTemplates = [];
   if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.categoryWeights) library.categoryWeights = {};
+  if (!library.curseCategoryWeights) library.curseCategoryWeights = {};
   if (!library.exclusionGroups) library.exclusionGroups = [];
   render();
 }
@@ -669,6 +750,8 @@ btnSaveAll.addEventListener('click', async () => {
   if (!library.curseTemplates) library.curseTemplates = [];
   if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.categoryWeights) library.categoryWeights = {};
+  if (!library.curseCategoryWeights) library.curseCategoryWeights = {};
   if (!library.exclusionGroups) library.exclusionGroups = [];
   render();
   showToast('Сохранено ✓');
@@ -701,7 +784,9 @@ if (generatorToggle) {
 
 if (btnAddExclGroup) {
   btnAddExclGroup.addEventListener('click', () => {
-    if (!library.exclusionGroups) library.exclusionGroups = [];
+    if (!library.categoryWeights) library.categoryWeights = {};
+  if (!library.curseCategoryWeights) library.curseCategoryWeights = {};
+  if (!library.exclusionGroups) library.exclusionGroups = [];
     library.exclusionGroups.push({ id: makeUidExcl(), label: '', items: [] });
     renderExclusionGroups();
     scheduleAutoSave();
@@ -880,5 +965,25 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Автосохранение: переключатель генератора
   if (generatorToggle) {
     generatorToggle.addEventListener('change', scheduleAutoSave);
+  }
+
+  // CategoryWeights add buttons
+  const btnAddCwTask  = document.getElementById('btn-add-cw-task');
+  const btnAddCwCurse = document.getElementById('btn-add-cw-curse');
+  if (btnAddCwTask) {
+    btnAddCwTask.addEventListener('click', () => {
+      if (!library.categoryWeights) library.categoryWeights = {};
+      library.categoryWeights[''] = 1;
+      renderCategoryWeights('task');
+      scheduleAutoSave();
+    });
+  }
+  if (btnAddCwCurse) {
+    btnAddCwCurse.addEventListener('click', () => {
+      if (!library.curseCategoryWeights) library.curseCategoryWeights = {};
+      library.curseCategoryWeights[''] = 1;
+      renderCategoryWeights('curse');
+      scheduleAutoSave();
+    });
   }
 });

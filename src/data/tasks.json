@@ -269,12 +269,16 @@
   "difficultyWeights": {
     "easy": 3,
     "medium": 2,
-    "heavy": 1
+    "heavy": 1,
+    "brutal": 0
   },
   "curseDifficultyWeights": {
     "easy": 3,
     "medium": 2,
-    "heavy": 1
+    "heavy": 1,
+    "brutal": 0
   },
-  "exclusionGroups": []
+  "exclusionGroups": [],
+  "categoryWeights": {},
+  "curseCategoryWeights": {}
 }

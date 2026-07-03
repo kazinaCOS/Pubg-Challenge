@@ -1,9 +1,9 @@
 const fs = require('fs');
 
-const DIFFICULTIES = ['easy', 'medium', 'heavy'];
+const DIFFICULTIES = ['easy', 'medium', 'heavy', 'brutal'];
 
 // Шанс по умолчанию для каждой сложности (суммарно не обязаны быть 100)
-const DEFAULT_DIFF_WEIGHTS = { easy: 3, medium: 2, heavy: 1 };
+const DEFAULT_DIFF_WEIGHTS = { easy: 3, medium: 2, heavy: 1, brutal: 0 };
 
 class TaskManager {
   constructor(tasksPath) {
@@ -22,6 +22,9 @@ class TaskManager {
       curseTemplates: [],
       difficultyWeights: { ...DEFAULT_DIFF_WEIGHTS },
       curseDifficultyWeights: { ...DEFAULT_DIFF_WEIGHTS },
+      // Шансы категорий (тегов): { "тег": weight } — перекрывает шанс сложности
+      categoryWeights: {},
+      curseCategoryWeights: {},
       // Группы взаимоисключений: [{id, label, items:[{type, id}]}]
       exclusionGroups: []
     };
@@ -80,6 +83,11 @@ class TaskManager {
     return excl;
   }
 
+  normalizeWeight(w) {
+    if (w == null) return null; // null = не задан, используется приоритет
+    return Number.isFinite(Number(w)) && Number(w) >= 0 ? Number(w) : null;
+  }
+
   normalizeItem(item) {
     if (!item || typeof item !== 'object') return null;
     const id = Number.isFinite(item.id) ? item.id : null;
@@ -88,8 +96,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = this.normalizeWeight(item.weight);
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, ...(weight != null ? { weight } : {}) };
   }
 
   normalizeTemplate(item) {
@@ -100,8 +109,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = this.normalizeWeight(item.weight);
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, ...(weight != null ? { weight } : {}) };
   }
 
   normalizePools(input) {
@@ -120,10 +130,63 @@ class TaskManager {
     for (const d of DIFFICULTIES) {
       const v = input && Number.isFinite(Number(input[d])) && Number(input[d]) >= 0
         ? Number(input[d])
-        : defaults[d];
+        : (defaults[d] ?? 0);
       result[d] = v;
     }
     return result;
+  }
+
+  normalizeCategoryWeights(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {};
+    const result = {};
+    for (const [k, v] of Object.entries(input)) {
+      if (typeof k === 'string' && Number.isFinite(Number(v)) && Number(v) >= 0) {
+        result[k] = Number(v);
+      }
+    }
+    return result;
+  }
+
+  // Вычисляет итоговый вес элемента с учётом приоритета:
+  // 1. Базовый: вес сложности из difficultyWeights
+  // 2. Если у элемента есть тег с categoryWeight — берём максимальный из совпавших тегов (перекрывает диф)
+  // 3. Если у элемента стоит индивидуальный weight > 0 — он перекрывает всё
+  resolveItemWeight(item, diffWeights, catWeights) {
+    // 1. Базовый — по сложности
+    const diff = item.difficulty || 'easy';
+    let w = (diffWeights && diffWeights[diff] != null) ? diffWeights[diff] : 1;
+
+    // 2. Категория (теги) — берём максимальный совпавший
+    if (catWeights && Array.isArray(item.tags) && item.tags.length) {
+      let catW = null;
+      for (const tag of item.tags) {
+        if (catWeights[tag] != null) {
+          catW = catW == null ? catWeights[tag] : Math.max(catW, catWeights[tag]);
+        }
+      }
+      if (catW != null) w = catW;
+    }
+
+    // 3. Индивидуальный weight — перекрывает всё
+    if (item.weight != null && Number.isFinite(item.weight) && item.weight >= 0) {
+      w = item.weight;
+    }
+
+    return w;
+  }
+
+  // Взвешенный выбор из пула с учётом приоритета шансов
+  weightedPickByPriority(pool, diffWeights, catWeights) {
+    if (!pool.length) return null;
+    const weights = pool.map(item => this.resolveItemWeight(item, diffWeights, catWeights));
+    const total = weights.reduce((s, w) => s + w, 0);
+    if (total <= 0) return this.randomFrom(pool); // все нули → случайный
+    let r = Math.random() * total;
+    for (let i = 0; i < pool.length; i++) {
+      r -= weights[i];
+      if (r <= 0) return pool[i];
+    }
+    return pool[pool.length - 1];
   }
 
   normalizeItems(items = []) {
@@ -142,8 +205,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = this.normalizeWeight(item.weight);
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, ...(weight != null ? { weight } : {}) };
   }
 
   normalizeCurses(items = []) {
@@ -158,8 +222,9 @@ class TaskManager {
     const description = typeof item.description === 'string' ? item.description.trim() : '';
     const tags = Array.isArray(item.tags) ? item.tags.filter(t => typeof t === 'string') : [];
     const difficulty = DIFFICULTIES.includes(item.difficulty) ? item.difficulty : 'easy';
+    const weight = this.normalizeWeight(item.weight);
     if (!title && !description) return null;
-    return { id, title, description, tags, difficulty };
+    return { id, title, description, tags, difficulty, ...(weight != null ? { weight } : {}) };
   }
 
   normalizeCurseTemplates(items = []) {
@@ -177,6 +242,8 @@ class TaskManager {
       curseTemplates: this.normalizeCurseTemplates(data.curseTemplates),
       difficultyWeights: this.normalizeDiffWeights(data.difficultyWeights),
       curseDifficultyWeights: this.normalizeDiffWeights(data.curseDifficultyWeights),
+      categoryWeights: this.normalizeCategoryWeights(data.categoryWeights),
+      curseCategoryWeights: this.normalizeCategoryWeights(data.curseCategoryWeights),
       exclusionGroups: this.normalizeExclusionGroups(data.exclusionGroups)
     };
   }
@@ -214,6 +281,8 @@ class TaskManager {
       curseTemplates: this.library.curseTemplates.map(item => ({ ...item })),
       difficultyWeights: { ...this.library.difficultyWeights },
       curseDifficultyWeights: { ...this.library.curseDifficultyWeights },
+      categoryWeights: { ...this.library.categoryWeights },
+      curseCategoryWeights: { ...this.library.curseCategoryWeights },
       exclusionGroups: JSON.parse(JSON.stringify(this.library.exclusionGroups || []))
     };
   }
@@ -330,9 +399,7 @@ class TaskManager {
     return filled;
   }
 
-  // Рукописное задание по сложности с исключением дублей текущего раунда
-  // excludeTaskIds — id рукописных заданий которые нельзя выбрать (history + exclusionGroups)
-  // excludeTemplateIds — id шаблонов которые нельзя использовать (exclusionGroups)
+  // Рукописное задание — взвешенный выбор с приоритетом diff→category→individual
   getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null, excludeIds = [], excludeTemplateIds = []) {
     let pool = this.library.tasks;
 
@@ -342,6 +409,8 @@ class TaskManager {
     }
 
     const allExclude = [...new Set([...recentTaskIds, ...excludeIds])];
+    const dw = this.library.difficultyWeights;
+    const cw = this.library.categoryWeights;
 
     let available = pool.filter(t => !allExclude.includes(t.id) && !this.hasConflict(t, activeCurses));
     if (!available.length) available = pool.filter(t => !allExclude.includes(t.id));
@@ -351,10 +420,10 @@ class TaskManager {
     if (!available.length) available = pool;
     if (!available.length) return null;
 
-    return this.randomFrom(available);
+    return this.weightedPickByPriority(available, dw, cw);
   }
 
-  // То же для генерируемых заданий — фильтрует шаблоны по excludeTemplateIds
+  // Генерируемое задание — взвешенный выбор шаблона
   getGeneratedTaskFiltered(activeCurses = [], difficulty = null, excludeTemplateIds = []) {
     let templates = this.library.templates;
     if (!templates.length) return null;
@@ -364,6 +433,9 @@ class TaskManager {
       if (byDiff.length) templates = byDiff;
     }
 
+    const dw = this.library.difficultyWeights;
+    const cw = this.library.categoryWeights;
+
     let available = templates
       .filter(t => !excludeTemplateIds.includes(t.id))
       .filter(t => !this.hasConflict(t, activeCurses));
@@ -372,7 +444,7 @@ class TaskManager {
     if (!available.length) available = templates;
     if (!available.length) return null;
 
-    return this.fillTemplate(this.randomFrom(available));
+    return this.fillTemplate(this.weightedPickByPriority(available, dw, cw));
   }
 
   // Рукописное наказание по сложности, без дублей активных
@@ -384,15 +456,18 @@ class TaskManager {
       if (byDiff.length) pool = byDiff;
     }
 
+    const dw = this.library.curseDifficultyWeights;
+    const cw = this.library.curseCategoryWeights;
+
     const allExclude = [...new Set([...activeCurseIds, ...excludeIds])];
     let available = pool.filter(c => !allExclude.includes(c.id));
     if (!available.length) available = pool.filter(c => !activeCurseIds.includes(c.id));
     if (!available.length) available = pool;
     if (!available.length) return null;
-    return this.randomFrom(available);
+    return this.weightedPickByPriority(available, dw, cw);
   }
 
-  // Генерируемое наказание с фильтром по excludeCurseTemplateIds
+  // Генерируемое наказание с взвешенным выбором шаблона
   getGeneratedCurseFiltered(difficulty = null, excludeCurseTemplateIds = []) {
     let templates = this.library.curseTemplates;
     if (!templates.length) return null;
@@ -402,11 +477,14 @@ class TaskManager {
       if (byDiff.length) templates = byDiff;
     }
 
+    const dw = this.library.curseDifficultyWeights;
+    const cw = this.library.curseCategoryWeights;
+
     let available = templates.filter(t => !excludeCurseTemplateIds.includes(t.id));
     if (!available.length) available = templates;
     if (!available.length) return null;
 
-    const template = this.randomFrom(available);
+    const template = this.weightedPickByPriority(available, dw, cw);
     const filled = this.fillTemplate(template);
     filled.generated = true;
     filled.isCurse = true;

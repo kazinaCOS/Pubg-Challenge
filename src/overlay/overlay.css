@@ -222,3 +222,6 @@ body {
 .mini {
   font-size: 0.85em;
 }
+
+/* Brutal difficulty */
+.diff-brutal { background: linear-gradient(135deg, #8b00ff, #ff0055); color: #fff; }

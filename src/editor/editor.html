@@ -38,6 +38,7 @@
           <button class="chip" data-diff="easy">Лёгкое</button>
           <button class="chip" data-diff="medium">Среднее</button>
           <button class="chip" data-diff="heavy">Тяжёлое</button>
+          <button class="chip" data-diff="brutal">Потужно</button>
         </div>
         <div class="filter-chips" id="task-tag-chips"></div>
       </div>
@@ -57,6 +58,7 @@
           <button class="chip" data-diff="easy">Лёгкое</button>
           <button class="chip" data-diff="medium">Среднее</button>
           <button class="chip" data-diff="heavy">Тяжёлое</button>
+          <button class="chip" data-diff="brutal">Потужно</button>
         </div>
         <div class="filter-chips" id="curse-tag-chips"></div>
       </div>
@@ -83,6 +85,7 @@
               <button class="chip" data-diff="easy">Лёгкое</button>
               <button class="chip" data-diff="medium">Среднее</button>
               <button class="chip" data-diff="heavy">Тяжёлое</button>
+              <button class="chip" data-diff="brutal">Потужно</button>
             </div>
             <div class="filter-chips" id="tmpl-tag-chips"></div>
           </div>
@@ -119,25 +122,39 @@
           <!-- Шансы сложностей -->
           <div class="dw-block">
             <h3 class="dw-title">Шансы заданий по сложности</h3>
-            <p class="hint">Больше = чаще выпадает. Лёгкое задание первого слота всегда принудительно.</p>
+            <p class="hint">Больше = чаще выпадает. Лёгкое задание первого слота всегда принудительно.<br>Приоритет: Индивид. шанс → Категория → Сложность.</p>
             <div class="dw-row">
               <label class="dw-label diff-easy-text">Лёгкое</label>
-              <input class="dw-input" type="number" id="dw-easy" min="0" max="99" value="3">
+              <input class="dw-input" type="number" id="dw-easy" min="0" max="999" value="3">
               <label class="dw-label diff-medium-text">Среднее</label>
-              <input class="dw-input" type="number" id="dw-medium" min="0" max="99" value="2">
+              <input class="dw-input" type="number" id="dw-medium" min="0" max="999" value="2">
               <label class="dw-label diff-heavy-text">Тяжёлое</label>
-              <input class="dw-input" type="number" id="dw-heavy" min="0" max="99" value="1">
+              <input class="dw-input" type="number" id="dw-heavy" min="0" max="999" value="1">
+              <label class="dw-label diff-brutal-text">Потужно</label>
+              <input class="dw-input" type="number" id="dw-brutal" min="0" max="999" value="0">
             </div>
 
-            <h3 class="dw-title" style="margin-top:14px">Шансы наказаний по сложности</h3>
+            <h3 class="dw-title" style="margin-top:14px">Шансы категорий заданий</h3>
+            <p class="hint">Перекрывает шанс сложности для заданий с этим тегом.</p>
+            <div id="cw-task-list" class="cw-list"></div>
+            <button id="btn-add-cw-task" class="secondary" style="margin-top:6px">+ Категория</button>
+
+            <h3 class="dw-title" style="margin-top:18px">Шансы наказаний по сложности</h3>
             <div class="dw-row">
               <label class="dw-label diff-easy-text">Лёгкое</label>
-              <input class="dw-input" type="number" id="cdw-easy" min="0" max="99" value="3">
+              <input class="dw-input" type="number" id="cdw-easy" min="0" max="999" value="3">
               <label class="dw-label diff-medium-text">Среднее</label>
-              <input class="dw-input" type="number" id="cdw-medium" min="0" max="99" value="2">
+              <input class="dw-input" type="number" id="cdw-medium" min="0" max="999" value="2">
               <label class="dw-label diff-heavy-text">Тяжёлое</label>
-              <input class="dw-input" type="number" id="cdw-heavy" min="0" max="99" value="1">
+              <input class="dw-input" type="number" id="cdw-heavy" min="0" max="999" value="1">
+              <label class="dw-label diff-brutal-text">Потужно</label>
+              <input class="dw-input" type="number" id="cdw-brutal" min="0" max="999" value="0">
             </div>
+
+            <h3 class="dw-title" style="margin-top:14px">Шансы категорий наказаний</h3>
+            <p class="hint">Перекрывает шанс сложности для наказаний с этим тегом.</p>
+            <div id="cw-curse-list" class="cw-list"></div>
+            <button id="btn-add-cw-curse" class="secondary" style="margin-top:6px">+ Категория</button>
           </div>
 
           <div class="preview-block">

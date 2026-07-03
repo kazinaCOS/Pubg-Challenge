@@ -703,3 +703,85 @@ button.danger { background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%); c
   color: #566070;
   padding: 4px 2px;
 }
+
+/* Brutal difficulty */
+.diff-brutal { background: linear-gradient(135deg, #8b00ff, #ff0055); color: #fff; }
+
+.diff-brutal-text { color: #d070ff; }
+
+/* Category weights list */
+.cw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.cw-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cw-tag {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.cw-val {
+  width: 60px;
+  padding: 4px 6px;
+  font-size: 12px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.cw-tag:focus, .cw-val:focus {
+  outline: none;
+  border-color: #4a8fff;
+}
+
+/* Individual weight row */
+.item-weight-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.item-weight-label {
+  font-size: 11px;
+  color: #8a9ab0;
+  white-space: nowrap;
+}
+
+.item-weight {
+  width: 70px;
+  padding: 3px 6px;
+  font-size: 12px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+  text-align: center;
+}
+
+.item-weight-hint {
+  font-size: 10px;
+  color: #566070;
+  font-style: italic;
+}
+
+.item-weight:focus {
+  outline: none;
+  border-color: #4a8fff;
+}

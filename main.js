@@ -122,9 +122,19 @@ function migrateTasksFile(targetPath, bundledPath) {
         changed = true;
       }
       if (!data.curseDifficultyWeights) {
-        data.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+        data.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1, brutal: 0 };
         changed = true;
       }
+      // brutal в обоих weights
+      if (data.difficultyWeights && data.difficultyWeights.brutal == null) {
+        data.difficultyWeights.brutal = 0; changed = true;
+      }
+      if (data.curseDifficultyWeights && data.curseDifficultyWeights.brutal == null) {
+        data.curseDifficultyWeights.brutal = 0; changed = true;
+      }
+      // categoryWeights
+      if (!data.categoryWeights) { data.categoryWeights = {}; changed = true; }
+      if (!data.curseCategoryWeights) { data.curseCategoryWeights = {}; changed = true; }
       // Убираем weight с элементов (устаревшее поле)
       ['tasks', 'curses', 'templates', 'curseTemplates'].forEach(key => {
         if (Array.isArray(data[key])) {
