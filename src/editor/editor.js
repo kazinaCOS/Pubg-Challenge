@@ -77,14 +77,20 @@ function renderTaskList(container, items, allItems) {
             <option value="medium" ${item.difficulty === 'medium' ? 'selected' : ''}>Среднее</option>
             <option value="heavy" ${item.difficulty === 'heavy' ? 'selected' : ''}>Тяжёлое</option>
           <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
-          <option value="brutal" ${item.difficulty === 'brutal' ? 'selected' : ''}>Потужно</option>
           </select>
         </div>
         <textarea class="item-desc" data-field="description" data-type="task" data-id="${item.id}"
           placeholder="Описание" rows="2">${esc(item.description || '')}</textarea>
         <input class="item-tags" type="text" data-field="tags" data-type="task" data-id="${item.id}"
           placeholder="Теги через запятую (транспорт, оружие...)"
-          value="${esc((item.tags || []).join(', '))}">
+          value="${esc((item.tags || []).join(', '))}">        
+        <label class="item-weight-row">
+          <span class="item-weight-label">Индивид. шанс</span>
+          <input class="item-weight" type="number" min="0" max="999" step="0.5"
+            data-field="weight" data-type="task" data-id="${item.id}"
+            value="${item.weight != null ? item.weight : ''}">
+          <span class="item-weight-hint">пусто = по сложности/категории</span>
+        </label>
 
       </div>
       <button class="danger btn-delete" data-delete-type="task" data-delete-id="${item.id}">✕</button>
