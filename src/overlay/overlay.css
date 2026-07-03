@@ -229,3 +229,28 @@ body {
 
 /* Brutal difficulty */
 .diff-brutal { background: linear-gradient(135deg, #8b00ff, #ff0055); color: #fff; }
+
+/* Drag-resize mode */
+.drag-handle {
+  position: fixed;
+  inset: 0;
+  background: rgba(74, 143, 255, 0.15);
+  border: 2px dashed rgba(74, 143, 255, 0.7);
+  border-radius: 1.2em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  -webkit-app-region: drag;
+  cursor: move;
+}
+
+.drag-hint {
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  -webkit-app-region: no-drag;
+  pointer-events: none;
+  text-align: center;
+}

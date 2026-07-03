@@ -14,5 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   exportLibrary: () => ipcRenderer.invoke('app:exportLibrary'),
   importLibrary: () => ipcRenderer.invoke('app:importLibrary'),
   startDragResize: () => ipcRenderer.invoke('app:startDragResize'),
-  stopDragResize: () => ipcRenderer.invoke('app:stopDragResize')
+  stopDragResize: () => ipcRenderer.invoke('app:stopDragResize'),
+  onDragMode: (cb) => ipcRenderer.on('overlay:dragMode', (_e, active) => cb(active))
 });

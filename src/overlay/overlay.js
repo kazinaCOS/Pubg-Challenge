@@ -158,6 +158,14 @@ async function updateFromMain() {
 window.addEventListener('DOMContentLoaded', async () => {
   await updateFromMain();
   setInterval(updateFromMain, 300);
+
+  // Режим drag-resize
+  const dragHandle = document.getElementById('drag-handle');
+  if (window.electronAPI && window.electronAPI.onDragMode) {
+    window.electronAPI.onDragMode((active) => {
+      if (dragHandle) dragHandle.style.display = active ? 'flex' : 'none';
+    });
+  }
 });
 
 window.addEventListener('resize', autoScale);

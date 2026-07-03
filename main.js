@@ -548,20 +548,24 @@ function registerHandlers() {
 
     // Импорт tasks.json из файла на диске
     startDragResize: async () => {
-      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      if (!overlayWindow || overlayWindow.isDestroyed()) return { ok: false };
       overlayWindow.setIgnoreMouseEvents(false);
       overlayWindow.setMovable(true);
       overlayWindow.setResizable(true);
-      overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      // Понижаем уровень чтобы оверлей не перекрывал контрольное окно во время drag
+      overlayWindow.setAlwaysOnTop(true, 'pop-up-menu');
+      overlayWindow.webContents.send('overlay:dragMode', true);
       return { ok: true };
     },
 
     stopDragResize: async () => {
-      if (!overlayWindow || overlayWindow.isDestroyed()) return;
+      if (!overlayWindow || overlayWindow.isDestroyed()) return { ok: false };
       const b = overlayWindow.getBounds();
       stateManager.updateSettings({ overlayX: b.x, overlayY: b.y, overlayWidth: b.width, overlayHeight: b.height });
       await stateManager.saveState();
       overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+      overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+      overlayWindow.webContents.send('overlay:dragMode', false);
       return { ok: true, state: getPublicState() };
     },
 
