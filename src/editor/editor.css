@@ -564,3 +564,142 @@ button.danger { background: linear-gradient(180deg, #ff7f7f 0%, #e33b3b 100%); c
   border-color: #4a8fff;
   background: rgba(74,143,255,0.1);
 }
+
+/* ─── Вкладка Исключения ──────────────────────────────────────────────────── */
+.excl-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
+}
+
+.excl-group {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.excl-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.excl-group-name {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.excl-group-name:focus {
+  outline: none;
+  border-color: #4a8fff;
+}
+
+.excl-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.excl-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.excl-item-type {
+  font-size: 11px;
+  color: #8a9ab0;
+  white-space: nowrap;
+  min-width: 110px;
+}
+
+.excl-item-title {
+  flex: 1;
+  color: #d0dae8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.excl-empty-hint {
+  font-size: 12px;
+  color: #566070;
+  padding: 4px 2px;
+}
+
+.excl-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  position: relative;
+}
+
+.excl-type-sel {
+  padding: 5px 8px;
+  font-size: 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+  cursor: pointer;
+}
+
+.excl-search-input {
+  flex: 1;
+  min-width: 160px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+}
+
+.excl-search-input:focus {
+  outline: none;
+  border-color: #4a8fff;
+}
+
+.excl-search-results {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.excl-result-item {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 7px;
+  background: rgba(74,143,255,0.12);
+  border: 1px solid rgba(74,143,255,0.25);
+  color: #d0dae8;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.excl-result-item:hover {
+  background: rgba(74,143,255,0.25);
+}
+
+.excl-no-results {
+  font-size: 12px;
+  color: #566070;
+  padding: 4px 2px;
+}

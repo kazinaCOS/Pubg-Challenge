@@ -133,6 +133,11 @@ function migrateTasksFile(targetPath, bundledPath) {
           if (JSON.stringify(data[key]) !== before) changed = true;
         }
       });
+      // exclusionGroups
+      if (!Array.isArray(data.exclusionGroups)) {
+        data.exclusionGroups = [];
+        changed = true;
+      }
     } else {
       if (!data.pools) { data.pools = {}; changed = true; }
       if (!data.templates) { data.templates = []; changed = true; }
@@ -307,36 +312,39 @@ function makeUid() {
 
 // Выбирает одно задание заданной сложности (50/50 генератор/рукописное если включён)
 // difficulty = null => выбирается по difficultyWeights, иначе принудительно
-function pickOneTask(difficulty, activeCurses, excludeIds = []) {
+// excl = { taskIds: Set, templateIds: Set } из getExcludedByActive
+function pickOneTask(difficulty, activeCurses, excludeIds = [], excl = null) {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
-  // Если difficulty не задан — берём по весам сложностей
   const diff = difficulty || taskManager.pickTaskDifficulty();
+
+  const exclTaskIds = excl ? [...excl.taskIds] : [];
+  const exclTmplIds = excl ? [...excl.templateIds] : [];
+  const allExcludeIds = [...new Set([...excludeIds, ...exclTaskIds])];
 
   if (genEnabled) {
     const hasWritten = taskManager.library.tasks.filter(t => t.difficulty === diff).length > 0;
     const hasTemplates = taskManager.library.templates.filter(t => t.difficulty === diff).length > 0;
 
     if (!hasWritten && hasTemplates) {
-      const gen = taskManager.getGeneratedTask(activeCurses, diff);
+      const gen = taskManager.getGeneratedTaskFiltered(activeCurses, diff, exclTmplIds);
       if (gen) return { ...gen, uid: makeUid() };
     } else if (hasWritten || hasTemplates) {
       const useGen = Math.random() < 0.5;
       if (useGen && hasTemplates) {
-        const gen = taskManager.getGeneratedTask(activeCurses, diff);
+        const gen = taskManager.getGeneratedTaskFiltered(activeCurses, diff, exclTmplIds);
         if (gen) return { ...gen, uid: makeUid() };
       }
     }
   }
 
   const recentIds = stateManager.getPublicState().recentTaskIds;
-  const task = taskManager.getRandomTask(recentIds, activeCurses, diff, excludeIds);
+  const task = taskManager.getRandomTask(recentIds, activeCurses, diff, allExcludeIds);
   if (task) {
     stateManager.addRecentTask(task.id);
     return { ...task, uid: makeUid() };
   }
 
-  // Fallback: без фильтра по diff
-  const taskAny = taskManager.getRandomTask(recentIds, activeCurses, null, excludeIds);
+  const taskAny = taskManager.getRandomTask(recentIds, activeCurses, null, allExcludeIds);
   if (taskAny) {
     stateManager.addRecentTask(taskAny.id);
     return { ...taskAny, uid: makeUid() };
@@ -349,42 +357,57 @@ function pickOneTask(difficulty, activeCurses, excludeIds = []) {
 // Дедупликация: задания не повторяются внутри раунда и не берутся из 2 предыдущих раундов
 function buildRound() {
   const activeCurses = getActiveCurseObjects();
-  // id из последних 2 раундов
   const historyIds = stateManager.getRecentRoundIds();
   const tasks = [];
-  const pickedIds = []; // id уже выбранных в текущем раунде
+  const pickedIds = [];
+  const pickedTmplIds = [];
+
+  // Начальное exclusion: на основе уже активных (наказания влияют)
+  // В buildRound activeTasks ещё пустые, поэтому только cursesIds влияют
+  const stateSnap = stateManager.getPublicState();
+  let excl = taskManager.getExcludedByActive([], stateSnap.activeCurseIds, stateSnap.generatedCurses || []);
 
   const tryPick = (difficulty) => {
+    // Обновляем excl на основе уже выбранных в раунде заданий
+    const roundTaskObjs = tasks.map(t => ({ id: t.id, generated: t.generated || false, templateId: t.templateId }));
+    excl = taskManager.getExcludedByActive(roundTaskObjs, stateSnap.activeCurseIds, stateSnap.generatedCurses || []);
+
     const exclude = [...historyIds, ...pickedIds];
-    const t = pickOneTask(difficulty, activeCurses, exclude);
+    const t = pickOneTask(difficulty, activeCurses, exclude, excl);
     if (t) {
       tasks.push(t);
       if (Number.isFinite(t.id) && t.id !== -1) pickedIds.push(t.id);
+      if (t.generated && Number.isFinite(t.templateId)) pickedTmplIds.push(t.templateId);
     }
   };
 
-  tryPick('easy'); // первое задание всегда лёгкое
-
-  // два следующих — сложность по difficultyWeights
+  tryPick('easy');
   for (let i = 0; i < 2; i++) {
-    tryPick(null); // null => выбор по весам внутри pickOneTask
+    tryPick(null);
   }
 
-  // Сохраняем текущий раунд в историю
   stateManager.pushRoundHistory(pickedIds);
-
   return tasks;
 }
 
-// Выбирает следующее наказание (сложность по curseDifficultyWeights, без дублей)
+// Выбирает следующее наказание (сложность по curseDifficultyWeights, без дублей, с учётом exclusionGroups)
 function pickNextCurse() {
   const genEnabled = stateManager.getPublicState().settings.generatorEnabled;
+  const stateSnap = stateManager.getPublicState();
   const activeCurseIds = stateManager.getActiveCurseIds();
-  // Сложность наказания выбирается по весам
   const diff = taskManager.pickCurseDifficulty();
 
+  // Вычисляем exclusion
+  const excl = taskManager.getExcludedByActive(
+    stateSnap.activeTasks || [],
+    activeCurseIds,
+    stateSnap.generatedCurses || []
+  );
+  const exclCurseIds = [...excl.curseIds];
+  const exclCurseTmplIds = [...excl.curseTemplateIds];
+
   if (genEnabled && taskManager.library.curses.length === 0) {
-    const gen = taskManager.getGeneratedCurse(diff);
+    const gen = taskManager.getGeneratedCurseFiltered(diff, exclCurseTmplIds);
     if (gen) stateManager.addGeneratedCurse(gen);
     return;
   }
@@ -392,13 +415,14 @@ function pickNextCurse() {
   if (genEnabled) {
     const useGen = Math.random() < 0.5;
     if (useGen) {
-      const gen = taskManager.getGeneratedCurse(diff);
+      const gen = taskManager.getGeneratedCurseFiltered(diff, exclCurseTmplIds);
       if (gen) stateManager.addGeneratedCurse(gen);
       return;
     }
   }
 
-  const curse = taskManager.getRandomCurse(activeCurseIds, activeCurseIds, diff);
+  const allExclCurse = [...new Set([...activeCurseIds, ...exclCurseIds])];
+  const curse = taskManager.getRandomCurse(activeCurseIds, allExclCurse, diff);
   if (curse) stateManager.addActiveCurse(curse.id);
 }
 

@@ -1,7 +1,7 @@
 'use strict';
 
 // ─── Состояние ───────────────────────────────────────────────────────────────
-let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [], difficultyWeights: { easy: 3, medium: 2, heavy: 1 }, curseDifficultyWeights: { easy: 3, medium: 2, heavy: 1 } };
+let library = { tasks: [], curses: [], generatorEnabled: false, pools: {}, templates: [], curseTemplates: [], difficultyWeights: { easy: 3, medium: 2, heavy: 1 }, curseDifficultyWeights: { easy: 3, medium: 2, heavy: 1 }, exclusionGroups: [] };
 
 const filters = {
   tasks:  { search: '', diff: '', tag: '' },
@@ -349,6 +349,7 @@ function render() {
   renderCurseTemplates();
   renderPools();
   renderDifficultyWeights();
+  renderExclusionGroups();
   if (generatorToggle) generatorToggle.checked = library.generatorEnabled === true;
 }
 
@@ -397,6 +398,7 @@ function collectAll() {
   library.generatorEnabled       = generatorToggle ? generatorToggle.checked : library.generatorEnabled;
   library.difficultyWeights      = collectDifficultyWeights('task');
   library.curseDifficultyWeights = collectDifficultyWeights('curse');
+  // exclusionGroups уже живёт в library напрямую (изменяется через renderExclusionGroups)
 }
 
 // ─── Превью генератора ────────────────────────────────────────────────────────
@@ -451,12 +453,166 @@ function bindAutoSave(container) {
   container.addEventListener('change', scheduleAutoSave);
 }
 
+// ─── Вкладка Исключения ──────────────────────────────────────────────────────
+const exclGroupsList  = document.getElementById('excl-groups-list');
+const btnAddExclGroup = document.getElementById('btn-add-excl-group');
+
+const TYPE_LABELS = {
+  task: '🎯 Задание',
+  curse: '⚠ Наказание',
+  template: '🎲 Шаблон задания',
+  curseTemplate: '🎲 Шаблон наказания'
+};
+
+function getItemLabel(type, id) {
+  let arr;
+  if (type === 'task') arr = library.tasks;
+  else if (type === 'curse') arr = library.curses;
+  else if (type === 'template') arr = library.templates;
+  else if (type === 'curseTemplate') arr = library.curseTemplates;
+  else return `#${id}`;
+  const found = (arr || []).find(i => i.id === id);
+  return found ? (found.title || '(без названия)') : `#${id} (удалено)`;
+}
+
+function makeUidExcl() {
+  return `excl_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function renderExclusionGroups() {
+  if (!exclGroupsList) return;
+  const groups = library.exclusionGroups || [];
+
+  if (!groups.length) {
+    exclGroupsList.innerHTML = '<div class="empty-hint">Нет групп. Нажми «+ Добавить группу».</div>';
+    return;
+  }
+
+  exclGroupsList.innerHTML = groups.map((group, gi) => `
+    <div class="excl-group" data-group-id="${esc(group.id)}">
+      <div class="excl-group-header">
+        <input class="excl-group-name" type="text"
+          placeholder="Название группы (опционально)"
+          value="${esc(group.label || '')}"
+          data-group-id="${esc(group.id)}">
+        <button class="danger btn-delete-excl-group" data-group-id="${esc(group.id)}">✕ Удалить группу</button>
+      </div>
+      <div class="excl-items" data-group-id="${esc(group.id)}">
+        ${(group.items || []).map((it, ii) => `
+          <div class="excl-item" data-group-id="${esc(group.id)}" data-item-idx="${ii}">
+            <span class="excl-item-type">${TYPE_LABELS[it.type] || it.type}</span>
+            <span class="excl-item-title">${esc(getItemLabel(it.type, it.id))}</span>
+            <button class="danger btn-delete-excl-item" data-group-id="${esc(group.id)}" data-item-idx="${ii}">✕</button>
+          </div>
+        `).join('')}
+        ${!(group.items || []).length ? '<div class="excl-empty-hint">Группа пустая — добавь элементы ниже.</div>' : ''}
+      </div>
+      <div class="excl-add-row">
+        <select class="excl-type-sel" data-group-id="${esc(group.id)}">
+          <option value="task">🎯 Задание</option>
+          <option value="curse">⚠ Наказание</option>
+          <option value="template">🎲 Шаблон задания</option>
+          <option value="curseTemplate">🎲 Шаблон наказания</option>
+        </select>
+        <input class="excl-search-input" type="text" placeholder="Поиск по названию..." data-group-id="${esc(group.id)}">
+        <div class="excl-search-results" data-group-id="${esc(group.id)}"></div>
+      </div>
+    </div>
+  `).join('');
+
+  // Bind: delete group
+  exclGroupsList.querySelectorAll('.btn-delete-excl-group').forEach(btn => {
+    btn.addEventListener('click', () => {
+      library.exclusionGroups = (library.exclusionGroups || []).filter(g => g.id !== btn.dataset.groupId);
+      renderExclusionGroups();
+      scheduleAutoSave();
+    });
+  });
+
+  // Bind: delete item from group
+  exclGroupsList.querySelectorAll('.btn-delete-excl-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const group = (library.exclusionGroups || []).find(g => g.id === btn.dataset.groupId);
+      if (!group) return;
+      group.items.splice(Number(btn.dataset.itemIdx), 1);
+      renderExclusionGroups();
+      scheduleAutoSave();
+    });
+  });
+
+  // Bind: group name change
+  exclGroupsList.querySelectorAll('.excl-group-name').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const group = (library.exclusionGroups || []).find(g => g.id === inp.dataset.groupId);
+      if (group) group.label = inp.value;
+      scheduleAutoSave();
+    });
+  });
+
+  // Bind: live search
+  exclGroupsList.querySelectorAll('.excl-search-input').forEach(inp => {
+    const groupId = inp.dataset.groupId;
+    const resultsEl = exclGroupsList.querySelector(`.excl-search-results[data-group-id="${groupId}"]`);
+    const typeSel = exclGroupsList.querySelector(`.excl-type-sel[data-group-id="${groupId}"]`);
+
+    const doSearch = () => {
+      const q = inp.value.trim().toLowerCase();
+      const type = typeSel.value;
+      let arr;
+      if (type === 'task') arr = library.tasks;
+      else if (type === 'curse') arr = library.curses;
+      else if (type === 'template') arr = library.templates;
+      else if (type === 'curseTemplate') arr = library.curseTemplates;
+      else arr = [];
+
+      const group = (library.exclusionGroups || []).find(g => g.id === groupId);
+      const alreadyIds = new Set((group ? group.items : []).filter(i => i.type === type).map(i => i.id));
+
+      const matches = (arr || [])
+        .filter(it => !alreadyIds.has(it.id) && (!q || (it.title || '').toLowerCase().includes(q)))
+        .slice(0, 8);
+
+      if (!matches.length && !q) {
+        resultsEl.innerHTML = '';
+        return;
+      }
+
+      resultsEl.innerHTML = matches.length
+        ? matches.map(it => `
+            <div class="excl-result-item" data-group-id="${groupId}" data-type="${type}" data-id="${it.id}">
+              ${esc(it.title || '(без названия)')}
+            </div>
+          `).join('')
+        : '<div class="excl-no-results">Ничего не найдено</div>';
+
+      resultsEl.querySelectorAll('.excl-result-item').forEach(row => {
+        row.addEventListener('click', () => {
+          const g = (library.exclusionGroups || []).find(g => g.id === row.dataset.groupId);
+          if (!g) return;
+          const newItem = { type: row.dataset.type, id: Number(row.dataset.id) };
+          if (!g.items.some(i => i.type === newItem.type && i.id === newItem.id)) {
+            g.items.push(newItem);
+          }
+          inp.value = '';
+          resultsEl.innerHTML = '';
+          renderExclusionGroups();
+          scheduleAutoSave();
+        });
+      });
+    };
+
+    inp.addEventListener('input', doSearch);
+    typeSel.addEventListener('change', () => { inp.value = ''; resultsEl.innerHTML = ''; });
+  });
+}
+
 // ─── Загрузка ─────────────────────────────────────────────────────────────────
 async function loadLibrary() {
   library = await window.electronAPI.getLibrary();
   if (!library.curseTemplates) library.curseTemplates = [];
   if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.exclusionGroups) library.exclusionGroups = [];
   render();
 }
 
@@ -513,6 +669,7 @@ btnSaveAll.addEventListener('click', async () => {
   if (!library.curseTemplates) library.curseTemplates = [];
   if (!library.difficultyWeights) library.difficultyWeights = { easy: 3, medium: 2, heavy: 1 };
   if (!library.curseDifficultyWeights) library.curseDifficultyWeights = { easy: 3, medium: 2, heavy: 1 };
+  if (!library.exclusionGroups) library.exclusionGroups = [];
   render();
   showToast('Сохранено ✓');
 });
@@ -539,6 +696,15 @@ if (generatorToggle) {
   generatorToggle.addEventListener('change', () => {
     library.generatorEnabled = generatorToggle.checked;
     // автосохранение навешено в DOMContentLoaded
+  });
+}
+
+if (btnAddExclGroup) {
+  btnAddExclGroup.addEventListener('click', () => {
+    if (!library.exclusionGroups) library.exclusionGroups = [];
+    library.exclusionGroups.push({ id: makeUidExcl(), label: '', items: [] });
+    renderExclusionGroups();
+    scheduleAutoSave();
   });
 }
 

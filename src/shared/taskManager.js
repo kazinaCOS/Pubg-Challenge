@@ -20,10 +20,64 @@ class TaskManager {
       pools: {},
       templates: [],
       curseTemplates: [],
-      // Шансы выпадения сложностей для заданий и наказаний
       difficultyWeights: { ...DEFAULT_DIFF_WEIGHTS },
-      curseDifficultyWeights: { ...DEFAULT_DIFF_WEIGHTS }
+      curseDifficultyWeights: { ...DEFAULT_DIFF_WEIGHTS },
+      // Группы взаимоисключений: [{id, label, items:[{type, id}]}]
+      exclusionGroups: []
     };
+  }
+
+  normalizeExclusionGroups(input) {
+    if (!Array.isArray(input)) return [];
+    const VALID_TYPES = new Set(['task', 'curse', 'template', 'curseTemplate']);
+    return input
+      .filter(g => g && typeof g === 'object')
+      .map(g => ({
+        id: typeof g.id === 'string' ? g.id : String(g.id || Math.random().toString(36).slice(2)),
+        label: typeof g.label === 'string' ? g.label.trim() : '',
+        items: Array.isArray(g.items)
+          ? g.items.filter(it => it && VALID_TYPES.has(it.type) && Number.isFinite(Number(it.id)))
+                   .map(it => ({ type: it.type, id: Number(it.id) }))
+          : []
+      }));
+  }
+
+  // Возвращает {taskIds: Set, curseIds: Set, templateIds: Set, curseTemplateIds: Set}
+  // содержащие id элементов, которые нельзя выбрать, т.к. другой элемент из той же группы уже активен.
+  // activeTasks = [{id, generated, templateId?}], activeCurseIds = [id], generatedCurses = [{templateId?}]
+  getExcludedByActive(activeTasks = [], activeCurseIds = [], generatedCurses = []) {
+    const excl = { taskIds: new Set(), curseIds: new Set(), templateIds: new Set(), curseTemplateIds: new Set() };
+    const groups = this.library.exclusionGroups || [];
+
+    for (const group of groups) {
+      const items = group.items || [];
+      // Проверяем, есть ли в группе хотя бы один активный элемент
+      let hit = false;
+
+      for (const it of items) {
+        if (it.type === 'task') {
+          if (activeTasks.some(t => !t.generated && t.id === it.id)) { hit = true; break; }
+        } else if (it.type === 'curse') {
+          if (activeCurseIds.includes(it.id)) { hit = true; break; }
+        } else if (it.type === 'template') {
+          if (activeTasks.some(t => t.generated && t.templateId === it.id)) { hit = true; break; }
+        } else if (it.type === 'curseTemplate') {
+          if (generatedCurses.some(c => c.templateId === it.id)) { hit = true; break; }
+        }
+      }
+
+      if (hit) {
+        // Все остальные элементы группы исключаются
+        for (const it of items) {
+          if (it.type === 'task') excl.taskIds.add(it.id);
+          else if (it.type === 'curse') excl.curseIds.add(it.id);
+          else if (it.type === 'template') excl.templateIds.add(it.id);
+          else if (it.type === 'curseTemplate') excl.curseTemplateIds.add(it.id);
+        }
+      }
+    }
+
+    return excl;
   }
 
   normalizeItem(item) {
@@ -122,7 +176,8 @@ class TaskManager {
       templates: this.normalizeTemplates(data.templates),
       curseTemplates: this.normalizeCurseTemplates(data.curseTemplates),
       difficultyWeights: this.normalizeDiffWeights(data.difficultyWeights),
-      curseDifficultyWeights: this.normalizeDiffWeights(data.curseDifficultyWeights)
+      curseDifficultyWeights: this.normalizeDiffWeights(data.curseDifficultyWeights),
+      exclusionGroups: this.normalizeExclusionGroups(data.exclusionGroups)
     };
   }
 
@@ -158,7 +213,8 @@ class TaskManager {
       templates: this.library.templates.map(item => ({ ...item })),
       curseTemplates: this.library.curseTemplates.map(item => ({ ...item })),
       difficultyWeights: { ...this.library.difficultyWeights },
-      curseDifficultyWeights: { ...this.library.curseDifficultyWeights }
+      curseDifficultyWeights: { ...this.library.curseDifficultyWeights },
+      exclusionGroups: JSON.parse(JSON.stringify(this.library.exclusionGroups || []))
     };
   }
 
@@ -275,7 +331,9 @@ class TaskManager {
   }
 
   // Рукописное задание по сложности с исключением дублей текущего раунда
-  getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null, excludeIds = []) {
+  // excludeTaskIds — id рукописных заданий которые нельзя выбрать (history + exclusionGroups)
+  // excludeTemplateIds — id шаблонов которые нельзя использовать (exclusionGroups)
+  getRandomTask(recentTaskIds = [], activeCurses = [], difficulty = null, excludeIds = [], excludeTemplateIds = []) {
     let pool = this.library.tasks;
 
     if (difficulty) {
@@ -296,8 +354,29 @@ class TaskManager {
     return this.randomFrom(available);
   }
 
+  // То же для генерируемых заданий — фильтрует шаблоны по excludeTemplateIds
+  getGeneratedTaskFiltered(activeCurses = [], difficulty = null, excludeTemplateIds = []) {
+    let templates = this.library.templates;
+    if (!templates.length) return null;
+
+    if (difficulty) {
+      const byDiff = templates.filter(t => t.difficulty === difficulty);
+      if (byDiff.length) templates = byDiff;
+    }
+
+    let available = templates
+      .filter(t => !excludeTemplateIds.includes(t.id))
+      .filter(t => !this.hasConflict(t, activeCurses));
+    if (!available.length) available = templates.filter(t => !excludeTemplateIds.includes(t.id));
+    if (!available.length) available = templates.filter(t => !this.hasConflict(t, activeCurses));
+    if (!available.length) available = templates;
+    if (!available.length) return null;
+
+    return this.fillTemplate(this.randomFrom(available));
+  }
+
   // Рукописное наказание по сложности, без дублей активных
-  getRandomCurse(activeCurseIds = [], excludeIds = [], difficulty = null) {
+  getRandomCurse(activeCurseIds = [], excludeIds = [], difficulty = null, excludeCurseTemplateIds = []) {
     let pool = this.library.curses;
 
     if (difficulty) {
@@ -311,6 +390,28 @@ class TaskManager {
     if (!available.length) available = pool;
     if (!available.length) return null;
     return this.randomFrom(available);
+  }
+
+  // Генерируемое наказание с фильтром по excludeCurseTemplateIds
+  getGeneratedCurseFiltered(difficulty = null, excludeCurseTemplateIds = []) {
+    let templates = this.library.curseTemplates;
+    if (!templates.length) return null;
+
+    if (difficulty) {
+      const byDiff = templates.filter(t => t.difficulty === difficulty);
+      if (byDiff.length) templates = byDiff;
+    }
+
+    let available = templates.filter(t => !excludeCurseTemplateIds.includes(t.id));
+    if (!available.length) available = templates;
+    if (!available.length) return null;
+
+    const template = this.randomFrom(available);
+    const filled = this.fillTemplate(template);
+    filled.generated = true;
+    filled.isCurse = true;
+    filled.difficulty = template.difficulty || 'easy';
+    return filled;
   }
 
   // Выбирает сложность для следующего задания на основе difficultyWeights

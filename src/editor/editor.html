@@ -22,6 +22,7 @@
       <button class="tab active" data-tab="tasks">🎯 Задания</button>
       <button class="tab" data-tab="curses">⚠ Наказания</button>
       <button class="tab" data-tab="generator">🎲 Генератор</button>
+      <button class="tab" data-tab="exclusions">🚫 Исключения</button>
     </nav>
 
     <!-- Задания -->
@@ -150,8 +151,20 @@
 
       </div>
     </section>
-  </main>
 
+    <!-- Исключения -->
+    <section class="tab-content" id="tab-exclusions">
+      <div class="panel-head">
+        <div>
+          <h2>Взаимоисключения</h2>
+          <p class="hint">Задания, наказания и шаблоны в одной группе не могут выпасть одновременно.</p>
+        </div>
+        <button id="btn-add-excl-group">+ Добавить группу</button>
+      </div>
+      <div id="excl-groups-list" class="excl-groups-list"></div>
+    </section>
+
+  </main>
   <script src="editor.js"></script>
 </body>
 </html>

@@ -275,5 +275,6 @@
     "easy": 3,
     "medium": 2,
     "heavy": 1
-  }
+  },
+  "exclusionGroups": []
 }
